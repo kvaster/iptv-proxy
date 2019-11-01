@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="false">
+
+    <timestamp key="bySecond" datePattern="yyyyMMdd'T'HHmmss" />
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <param name="target" value="System.out" />
+        <encoder>
+            <pattern>%date{HH:mm:ss.SSS} [%-5level] :: %thread \(%class{0}\) :: %message%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <logger name="com.kvaster" additivity="false">
+        <level value="debug" />
+        <appender-ref ref="CONSOLE" />
+    </logger>
+
+    <root level="error">
+        <appender-ref ref="CONSOLE" />
+    </root>
+
+</configuration>

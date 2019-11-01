@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="false">
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${dir.log:-${dir.tmp:-.tmp}}/gsuite-sync.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${dir.log:-${dir.tmp:-.tmp}}/gsuite-sync.log.%d{yyyy-MM-dd}.gz</fileNamePattern>
+            <maxHistory>180</maxHistory>
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>%d{dd.MM.yyyy HH:mm:ss} [%-5level] :: %thread \(%c{0}\) :: %m%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.kvaster" additivity="false">
+        <level value="info" />
+        <appender-ref ref="FILE" />
+    </logger>
+
+    <root level="error">
+        <appender-ref ref="FILE" />
+    </root>
+
+</configuration>
