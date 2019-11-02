@@ -2,10 +2,10 @@
 <configuration debug="false">
 
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${dir.log:-${dir.tmp:-.tmp}}/gsuite-sync.log</file>
+        <file>${dir.log:-${dir.tmp:-.tmp}}/iptv-proxy.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>${dir.log:-${dir.tmp:-.tmp}}/gsuite-sync.log.%d{yyyy-MM-dd}.gz</fileNamePattern>
-            <maxHistory>180</maxHistory>
+            <maxHistory>30</maxHistory>
         </rollingPolicy>
 
         <encoder>

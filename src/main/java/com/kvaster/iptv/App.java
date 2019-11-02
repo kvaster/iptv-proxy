@@ -2,6 +2,7 @@ package com.kvaster.iptv;
 
 import java.io.File;
 
+import com.kvaster.iptv.config.IptvProxyConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,9 +15,9 @@ public class App {
 
             File configFile = new File(System.getProperty("config", "config.yml"));
 
-            ProxyConfig config = ConfigLoader.loadConfig(configFile, ProxyConfig.class);
+            IptvProxyConfig config = ConfigLoader.loadConfig(configFile, IptvProxyConfig.class);
 
-            ProxyService service = new ProxyService(config);
+            IptvProxyService service = new IptvProxyService(config);
 
             Runtime.getRuntime().addShutdownHook(new Thread(service::stopService));
             service.startService();

@@ -86,13 +86,13 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     @Override
     public void onError(Throwable throwable) {
-        LOG.info("onError", throwable);
+        // LOG.info("onError", throwable);
         exchange.endExchange();
     }
 
     @Override
     public void onComplete() {
-        LOG.info("onComplete");
+        // LOG.info("onComplete");
         exchange.endExchange();
     }
 }
