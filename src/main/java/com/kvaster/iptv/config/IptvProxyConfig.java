@@ -7,7 +7,6 @@ public class IptvProxyConfig {
     private String host = "127.0.0.1";
     private int port = 8080;
     private String baseUrl;
-    private int clientTimeoutSec = 10;
     private String tokenSalt;
     private List<IptvServerConfig> servers;
 
@@ -15,14 +14,11 @@ public class IptvProxyConfig {
         // for deserialization
     }
 
-    public IptvProxyConfig(
-            String host, int port, String baseUrl, int clientTimeoutSec, String tokenSalt,
-            List<IptvServerConfig> servers
-    ) {
+    public IptvProxyConfig(String host, int port, String baseUrl, String tokenSalt, List<IptvServerConfig> servers) {
         this.host = host;
         this.port = port;
         this.baseUrl = baseUrl;
-        this.clientTimeoutSec = clientTimeoutSec;
+        this.tokenSalt = tokenSalt;
         this.servers = new ArrayList<>(servers);
     }
 
@@ -36,10 +32,6 @@ public class IptvProxyConfig {
 
     public String getBaseUrl() {
         return baseUrl;
-    }
-
-    public int getClientTimeoutSec() {
-        return clientTimeoutSec;
     }
 
     public String getTokenSalt() {

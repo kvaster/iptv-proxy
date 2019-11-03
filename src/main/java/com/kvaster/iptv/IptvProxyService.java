@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -37,7 +38,6 @@ public class IptvProxyService implements HttpHandler {
 
     private final String baseUrl;
     private final String tokenSalt;
-    private final long clientTimeoutMillis;
 
     private final AtomicLong idCounter = new AtomicLong(System.currentTimeMillis());
 
@@ -45,12 +45,11 @@ public class IptvProxyService implements HttpHandler {
     private volatile Map<String, IptvChannel> channels = new HashMap<>();
     private Map<String, IptvServerChannel> serverChannelsByUrl = new HashMap<>();
 
-    private final Map<String, IptvUser> users = new HashMap<>();
+    private final Map<String, IptvUser> users = new ConcurrentHashMap<>();
 
     public IptvProxyService(IptvProxyConfig config) {
         this.baseUrl = config.getBaseUrl();
         this.tokenSalt = config.getTokenSalt();
-        this.clientTimeoutMillis = TimeUnit.SECONDS.toMillis(config.getClientTimeoutSec());
 
         httpClient = HttpClient.newBuilder().build();
 
@@ -93,9 +92,9 @@ public class IptvProxyService implements HttpHandler {
 
     private void updateChannels() {
         if (updateChannelsImpl())
-            scheduleChannelsUpdate(TimeUnit.MINUTES.toMillis(10));
-        else
             scheduleChannelsUpdate(TimeUnit.MINUTES.toMillis(240));
+        else
+            scheduleChannelsUpdate(TimeUnit.MINUTES.toMillis(10));
     }
 
     private boolean updateChannelsImpl() {
@@ -227,36 +226,37 @@ public class IptvProxyService implements HttpHandler {
             return false;
         }
 
-        IptvUser iu = onUserAccess(user);
-        IptvServerChannel serverChannel = iu.getServerChannel(channel);
-        if (serverChannel == null) {
-            return false;
-        }
-
-        return serverChannel.handle(exchange, path, user, token);
-    }
-
-    private synchronized IptvUser onUserAccess(String user) {
         IptvUser iu = users.computeIfAbsent(user, IptvUser::new);
+        iu.lock();
+        try {
+            // cancel any expiring tasks
+            iu.cancelTask();
 
-        TimerTask t = new TimerTask() {
-            @Override
-            public void run() {
-                removeUser(iu);
+            IptvServerChannel serverChannel = iu.getServerChannel(channel);
+            if (serverChannel == null) {
+                return false;
             }
-        };
 
-        timer.schedule(t, clientTimeoutMillis);
+            return serverChannel.handle(exchange, path, iu, token);
+        } finally {
+            // launch expiring task
+            TimerTask t = new TimerTask() {
+                @Override
+                public void run() {
+                    iu.lock();
+                    try {
+                        users.remove(iu.getId(), iu);
+                        iu.onRemove();
+                    } finally {
+                        iu.unlock();
+                    }
+                }
+            };
 
-        iu.onAccess(t);
+            iu.setTask(t);
+            timer.schedule(t, iu.expireDelay() + 100); // add 100ms for timer
 
-        return iu;
-    }
-
-    private synchronized void removeUser(IptvUser iu) {
-        if (iu.needRemove(clientTimeoutMillis)) {
-            iu.onRemove();
-            users.remove(iu.getId());
+            iu.unlock();
         }
     }
 

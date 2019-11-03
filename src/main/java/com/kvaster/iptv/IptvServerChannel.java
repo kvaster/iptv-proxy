@@ -1,25 +1,35 @@
 package com.kvaster.iptv;
 
+import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.TemporalAccessor;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import com.kvaster.utils.digest.Digest;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.SameThreadExecutor;
-import io.undertow.util.StatusCodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IptvServerChannel {
     private static final Logger LOG = LoggerFactory.getLogger(IptvServerChannel.class);
+
+    private static final String TAG_EXTINF = "#EXTINF:";
+    private static final String TAG_PROGRAM_DATE_TIME = "#EXT-X-PROGRAM-DATE-TIME:";
 
     private final IptvServer server;
     private final String channelUrl;
@@ -29,7 +39,19 @@ public class IptvServerChannel {
 
     private final HttpClient httpClient;
 
-    private volatile Map<String, String> streamMap = new HashMap<>();
+    private static class Stream {
+        String url;
+        long startTime;
+        long durationMillis;
+
+        Stream(String url, long startTime, long durationMillis) {
+            this.url = url;
+            this.startTime = startTime;
+            this.durationMillis = durationMillis;
+        }
+    }
+
+    private volatile Map<String, Stream> streamMap = new HashMap<>();
 
     private static final HttpString[] HEADERS = {
         Headers.CONTENT_TYPE,
@@ -73,26 +95,29 @@ public class IptvServerChannel {
         server.release();
     }
 
-    public boolean handle(HttpServerExchange exchange, String path, String user, String token) {
+    public boolean handle(HttpServerExchange exchange, String path, IptvUser user, String token) {
         if ("channel.m3u8".equals(path)) {
             handleInfo(exchange, user, token);
             return true;
         } else {
-            String streamUrl = streamMap.get(path);
-            LOG.info("Stream: {}, url: {}", user, streamUrl);
+            Stream stream = streamMap.get(path);
 
-            // TODO allow redirects through caching nginx or direct redirects
+            if (stream != null) {
+                LOG.info("Stream: {}, url: {}", user.getId(), stream.url);
+
+                // usually we expect that player will try not to decrease buffer size
+                // so we may expect that player will try to buffer more segments with durationMillis delay
+                user.setExpireTime(System.currentTimeMillis() + stream.durationMillis * 3 / 2);
+
 //            if (true) {
 //                exchange.setStatusCode(StatusCodes.FOUND);
 //                exchange.getResponseHeaders().add(Headers.LOCATION, streamUrl);
 //                exchange.endExchange();
 //                return true;
 //            }
-
-            if (streamUrl != null) {
                 exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
                     HttpRequest req = HttpRequest.newBuilder()
-                            .uri(URI.create(streamUrl))
+                            .uri(URI.create(stream.url))
                             .timeout(Duration.ofSeconds(5))
                             .build();
 
@@ -118,9 +143,9 @@ public class IptvServerChannel {
         return false;
     }
 
-    private void handleInfo(HttpServerExchange exchange, String user, String token) {
+    private void handleInfo(HttpServerExchange exchange, IptvUser user, String token) {
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-            LOG.info("Channel: {}, user: {}, url: {}", channelName, user, channelUrl);
+            LOG.info("Channel: {}, user: {}, url: {}", channelName, user.getId(), channelUrl);
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(channelUrl))
@@ -138,17 +163,44 @@ public class IptvServerChannel {
                             Digest digest = Digest.sha256();
                             StringBuilder sb = new StringBuilder();
 
-                            Map<String, String> streamMap = new HashMap<>();
+                            Map<String, Stream> streamMap = new HashMap<>();
+
+                            long durationMillis = 0;
+                            long startTime = 0;
 
                             for (String l : info) {
                                 l = l.trim();
 
                                 if (l.startsWith("#")) {
+                                    if (l.startsWith(TAG_EXTINF)) {
+                                        String v = l.substring(TAG_EXTINF.length());
+                                        int idx = v.indexOf(',');
+                                        if (idx >= 0) {
+                                            v = v.substring(0, idx);
+                                        }
+
+                                        try {
+                                            durationMillis = new BigDecimal(v).multiply(new BigDecimal(1000)).longValue();
+                                        } catch (NumberFormatException e) {
+                                            // do nothing
+                                        }
+                                    } else if (l.startsWith(TAG_PROGRAM_DATE_TIME)) {
+                                        try {
+                                            ZonedDateTime dateTime = ZonedDateTime.parse(l.substring(TAG_PROGRAM_DATE_TIME.length()), DateTimeFormatter.ISO_DATE_TIME);
+                                            startTime = dateTime.toInstant().toEpochMilli();
+                                        } catch (Exception e) {
+                                            // do nothing
+                                        }
+                                    }
+
                                     sb.append(l).append("\n");
                                 } else {
                                     String path = digest.digest(l) + ".ts";
-                                    streamMap.put(path, l);
+                                    streamMap.put(path, new Stream(l, startTime, durationMillis));
                                     sb.append(baseUrl).append('/').append(path).append("?t=").append(token).append("\n");
+
+                                    startTime = durationMillis == 0 ? 0 : startTime + durationMillis;
+                                    durationMillis = 0;
                                 }
                             }
 

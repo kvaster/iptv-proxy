@@ -1,7 +1,9 @@
 package com.kvaster.iptv;
 
-import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,8 +12,10 @@ public class IptvUser {
     private static final Logger LOG = LoggerFactory.getLogger(IptvUser.class);
 
     private final String id;
+    private final Lock lock = new ReentrantLock();
 
-    private long lastAccess = System.currentTimeMillis();
+    private long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
+
     private TimerTask task;
 
     private volatile IptvServerChannel serverChannel;
@@ -22,25 +26,47 @@ public class IptvUser {
         LOG.info("User created: {}", id);
     }
 
+    public void lock() {
+        lock.lock();
+    }
+
+    public void unlock() {
+        lock.unlock();
+    }
+
     public String getId() {
         return id;
     }
 
-    public boolean needRemove(long delay) {
-        return (System.currentTimeMillis() - lastAccess) >= delay;
+    public long expireDelay() {
+        return expireTime - System.currentTimeMillis();
     }
 
-    public void onAccess(TimerTask task) {
-        lastAccess = System.currentTimeMillis();
+    public boolean isExpired(long delay) {
+        return expireTime <= 0;
+    }
 
-        if (this.task != null) {
-            this.task.cancel();
+    public void setExpireTime(long expireTime) {
+        this.expireTime = expireTime;
+    }
+
+    public void addExpireTime(long durationMillis) {
+        expireTime += durationMillis;
+    }
+
+    public void cancelTask() {
+        if (task != null) {
+            task.cancel();
+            task = null;
         }
+    }
 
+    public void setTask(TimerTask task) {
+        cancelTask();
         this.task = task;
     }
 
-    public synchronized void onRemove() {
+    public void onRemove() {
         if (serverChannel != null) {
             serverChannel.release();
             serverChannel = null;
@@ -49,7 +75,7 @@ public class IptvUser {
         LOG.info("User removed: {}", id);
     }
 
-    public synchronized IptvServerChannel getServerChannel(IptvChannel channel) {
+    public IptvServerChannel getServerChannel(IptvChannel channel) {
         if (serverChannel != null) {
             if (serverChannel.getChannelId().equals(channel.getId())) {
                 return serverChannel;
@@ -57,6 +83,8 @@ public class IptvUser {
 
             serverChannel.release();
         }
+
+        expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
 
         serverChannel = channel.acquire();
 
