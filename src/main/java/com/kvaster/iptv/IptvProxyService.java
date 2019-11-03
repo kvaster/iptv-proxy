@@ -233,8 +233,7 @@ public class IptvProxyService implements HttpHandler {
             return false;
         }
 
-        serverChannel.handle(exchange, path, token);
-        return true;
+        return serverChannel.handle(exchange, path, user, token);
     }
 
     private synchronized IptvUser onUserAccess(String user) {

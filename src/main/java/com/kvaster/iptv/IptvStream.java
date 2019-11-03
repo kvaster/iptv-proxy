@@ -2,6 +2,7 @@ package com.kvaster.iptv;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.Flow.Subscriber;
@@ -25,20 +26,24 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     private Subscription subscription;
 
+    private static ByteBuffer END_MARKER = ByteBuffer.allocate(0);
+    private static List<ByteBuffer> END_ARRAY_MARKER = Collections.singletonList(END_MARKER);
+
     public IptvStream(HttpServerExchange exchange) {
         this.exchange = exchange;
     }
 
     @Override
-    public synchronized void onSubscribe(Subscription subscription) {
+    public void onSubscribe(Subscription subscription) {
         this.subscription = subscription;
         subscription.request(1);
     }
 
-    private synchronized void cancel() {
-        if (subscription != null) {
-            subscription.cancel();
-        }
+    private void finish() {
+        // subscription can't be null at this place
+        subscription.cancel();
+
+        onNext(END_ARRAY_MARKER);
     }
 
     @Override
@@ -64,6 +69,11 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     }
 
     private boolean sendNext(ByteBuffer b) {
+        if (b == END_MARKER) {
+            exchange.endExchange();
+            return true;
+        }
+
         AtomicBoolean completed = new AtomicBoolean(false);
 
         exchange.getResponseSender().send(b, new IoCallback() {
@@ -76,8 +86,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
             @Override
             public void onException(HttpServerExchange exchange, Sender sender, IOException exception) {
-                exchange.endExchange();
-                cancel();
+                finish();
             }
         });
 
@@ -86,13 +95,13 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     @Override
     public void onError(Throwable throwable) {
-        // LOG.info("onError", throwable);
-        exchange.endExchange();
+        LOG.warn("Error on loading stream", throwable);
+        finish();
     }
 
     @Override
     public void onComplete() {
         // LOG.info("onComplete");
-        exchange.endExchange();
+        finish();
     }
 }
