@@ -107,7 +107,7 @@ public class IptvServerChannel {
 
                 // usually we expect that player will try not to decrease buffer size
                 // so we may expect that player will try to buffer more segments with durationMillis delay
-                user.setExpireTime(System.currentTimeMillis() + stream.durationMillis * 3 / 2);
+                user.setExpireTime(System.currentTimeMillis() + stream.durationMillis * 2 + 1000);
 
 //            if (true) {
 //                exchange.setStatusCode(StatusCodes.FOUND);
