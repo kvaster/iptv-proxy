@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,9 +48,15 @@ public class IptvProxyService implements HttpHandler {
 
     private final Map<String, IptvUser> users = new ConcurrentHashMap<>();
 
+    private final boolean allowAnonymous;
+    private final Set<String> allowedUsers;
+
     public IptvProxyService(IptvProxyConfig config) {
         this.baseUrl = config.getBaseUrl();
         this.tokenSalt = config.getTokenSalt();
+
+        this.allowAnonymous = config.getAllowAnonymous();
+        this.allowedUsers = config.getUsers();
 
         httpClient = HttpClient.newBuilder().build();
 
@@ -198,9 +205,8 @@ public class IptvProxyService implements HttpHandler {
             path = path.substring(1);
         }
 
-        if ("m3u".equals(path)) {
-            handleM3u(exchange);
-            return true;
+        if (path.startsWith("m3u")) {
+            return handleM3u(exchange, path);
         }
 
         // channels
@@ -280,13 +286,34 @@ public class IptvProxyService implements HttpHandler {
         return null;
     }
 
-    private String generateToken() {
-        String user = String.valueOf(idCounter.incrementAndGet());
+    private String generateUser() {
+        return String.valueOf(idCounter.incrementAndGet());
+    }
+
+    private String  generateToken(String user) {
         return user + '-' + Digest.md5(user + tokenSalt);
     }
 
-    private void handleM3u(HttpServerExchange exchange) {
-        String token = generateToken();
+    private boolean handleM3u(HttpServerExchange exchange, String path) {
+        String user = null;
+
+        int idx = path.indexOf('/');
+        if (idx >= 0) {
+            user = path.substring(idx + 1);
+            if (!allowedUsers.contains(user)) {
+                user = null;
+            }
+        }
+
+        if (user == null && allowAnonymous) {
+            user = generateUser();
+        }
+
+        if (user == null) {
+            return false;
+        }
+
+        String token = generateToken(user);
 
         exchange.getResponseHeaders()
                 .add(Headers.CONTENT_TYPE, "audio/mpegurl")
@@ -306,5 +333,7 @@ public class IptvProxyService implements HttpHandler {
         });
 
         exchange.getResponseSender().send(sb.toString());
+
+        return true;
     }
 }

@@ -1,7 +1,9 @@
 package com.kvaster.iptv.config;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class IptvProxyConfig {
     private String host = "127.0.0.1";
@@ -9,17 +11,24 @@ public class IptvProxyConfig {
     private String baseUrl;
     private String tokenSalt;
     private List<IptvServerConfig> servers;
+    private boolean allowAnonymous = true;
+    private Set<String> users = new HashSet<>();
 
     protected IptvProxyConfig() {
         // for deserialization
     }
 
-    public IptvProxyConfig(String host, int port, String baseUrl, String tokenSalt, List<IptvServerConfig> servers) {
+    public IptvProxyConfig(
+            String host, int port, String baseUrl, String tokenSalt, List<IptvServerConfig> servers,
+            boolean allowAnonymous, Set<String> users
+    ) {
         this.host = host;
         this.port = port;
         this.baseUrl = baseUrl;
         this.tokenSalt = tokenSalt;
         this.servers = new ArrayList<>(servers);
+        this.allowAnonymous = allowAnonymous;
+        this.users = new HashSet<>(users);
     }
 
     public String getHost() {
@@ -40,5 +49,13 @@ public class IptvProxyConfig {
 
     public List<IptvServerConfig> getServers() {
         return servers;
+    }
+
+    public boolean getAllowAnonymous() {
+        return allowAnonymous;
+    }
+
+    public Set<String> getUsers() {
+        return users;
     }
 }
