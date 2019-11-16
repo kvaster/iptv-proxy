@@ -49,7 +49,7 @@ public class Digest {
     private static String toHex(byte[] digest) {
         StringBuilder sb = new StringBuilder(digest.length * 2);
         for (byte b : digest) {
-            sb.append(HEX[(b & 0xf0) >> 8]).append(HEX[b & 0x0f]);
+            sb.append(HEX[(b & 0xf0) >> 4]).append(HEX[b & 0x0f]);
         }
 
         return sb.toString();
