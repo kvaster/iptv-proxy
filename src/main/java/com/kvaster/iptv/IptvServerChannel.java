@@ -119,6 +119,8 @@ public class IptvServerChannel {
                     HttpRequest req = HttpRequest.newBuilder()
                             .uri(URI.create(stream.url))
                             .timeout(Duration.ofSeconds(5))
+                            .version(HttpClient.Version.HTTP_1_1)
+                            .setHeader(Headers.KEEP_ALIVE.toString(), "false")
                             .build();
 
                     httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
@@ -150,6 +152,8 @@ public class IptvServerChannel {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(channelUrl))
                     .timeout(Duration.ofSeconds(5))
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .setHeader(Headers.KEEP_ALIVE.toString(), "false")
                     .build();
 
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())

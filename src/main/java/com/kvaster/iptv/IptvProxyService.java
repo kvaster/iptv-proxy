@@ -172,6 +172,8 @@ public class IptvProxyService implements HttpHandler {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofSeconds(5))
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .setHeader(Headers.KEEP_ALIVE.toString(), "false")
                     .build();
 
             HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());

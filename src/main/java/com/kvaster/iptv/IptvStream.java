@@ -24,7 +24,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     private Queue<ByteBuffer> buffers = new LinkedBlockingQueue<>();
     private AtomicBoolean busy = new AtomicBoolean();
 
-    private Subscription subscription;
+    private volatile Subscription subscription;
 
     private static ByteBuffer END_MARKER = ByteBuffer.allocate(0);
     private static List<ByteBuffer> END_ARRAY_MARKER = Collections.singletonList(END_MARKER);
@@ -35,8 +35,14 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     @Override
     public void onSubscribe(Subscription subscription) {
+        if (this.subscription != null) {
+            LOG.error("Already subscribed");
+            subscription.cancel();
+            return;
+        }
+
         this.subscription = subscription;
-        subscription.request(1);
+        subscription.request(Long.MAX_VALUE);
     }
 
     private void finish() {
@@ -54,7 +60,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
             sendNext();
         }
 
-        subscription.request(1);
+        subscription.request(Long.MAX_VALUE);
     }
 
     private void sendNext() {
@@ -86,6 +92,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
             @Override
             public void onException(HttpServerExchange exchange, Sender sender, IOException exception) {
+                LOG.warn("Error on sending stream");
                 finish();
             }
         });
