@@ -6,13 +6,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
-import java.time.temporal.TemporalAccessor;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +34,7 @@ public class IptvServerChannel {
     private final String channelName;
 
     private final HttpClient httpClient;
+    private final int timeoutSec;
 
     private static class Stream {
         String url;
@@ -67,7 +64,10 @@ public class IptvServerChannel {
         new HttpString("x-run-time")
     };
 
-    public IptvServerChannel(IptvServer server, String channelUrl, String baseUrl, String channelId, String channelName, HttpClient httpClient) {
+    public IptvServerChannel(
+            IptvServer server, String channelUrl, String baseUrl, String channelId, String channelName,
+            HttpClient httpClient, int timeoutSec
+    ) {
         this.server = server;
         this.channelUrl = channelUrl;
         this.baseUrl = baseUrl;
@@ -75,6 +75,7 @@ public class IptvServerChannel {
         this.channelName = channelName;
 
         this.httpClient = httpClient;
+        this.timeoutSec = timeoutSec;
     }
 
     public String getChannelId() {
@@ -118,17 +119,12 @@ public class IptvServerChannel {
                 exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
                     HttpRequest req = HttpRequest.newBuilder()
                             .uri(URI.create(stream.url))
-                            .timeout(Duration.ofSeconds(5))
-                            .version(HttpClient.Version.HTTP_1_1)
-                            .setHeader(Headers.KEEP_ALIVE.toString(), "false")
+                            .timeout(Duration.ofSeconds(timeoutSec))
                             .build();
 
                     httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
-                            .thenAccept((resp) -> {
-                                if (resp.statusCode() != HttpURLConnection.HTTP_OK) {
-                                    exchange.setStatusCode(resp.statusCode());
-                                    exchange.getResponseSender().send("error");
-                                } else {
+                            .whenComplete((resp, err) -> {
+                                if (HttpUtils.isOk(resp, err, exchange)) {
                                     for (HttpString header : HEADERS) {
                                         resp.headers().firstValue(header.toString()).ifPresent(value -> exchange.getResponseHeaders().add(header, value));
                                     }
@@ -146,22 +142,19 @@ public class IptvServerChannel {
     }
 
     private void handleInfo(HttpServerExchange exchange, IptvUser user, String token) {
+        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSec + 1));
+
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             LOG.info("Channel: {}, user: {}, url: {}", channelName, user.getId(), channelUrl);
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(channelUrl))
-                    .timeout(Duration.ofSeconds(5))
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .setHeader(Headers.KEEP_ALIVE.toString(), "false")
+                    .timeout(Duration.ofSeconds(timeoutSec))
                     .build();
 
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                    .thenAccept(resp -> {
-                        if (resp.statusCode() != HttpURLConnection.HTTP_OK) {
-                            exchange.setStatusCode(resp.statusCode());
-                            exchange.getResponseSender().send("error");
-                        } else {
+                    .whenComplete((resp, err) -> {
+                        if (HttpUtils.isOk(resp, err, exchange)) {
                             String[] info = resp.body().split("\n");
 
                             Digest digest = Digest.sha256();

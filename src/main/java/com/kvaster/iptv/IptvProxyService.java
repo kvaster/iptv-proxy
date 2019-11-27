@@ -51,12 +51,16 @@ public class IptvProxyService implements HttpHandler {
     private final boolean allowAnonymous;
     private final Set<String> allowedUsers;
 
-    public IptvProxyService(IptvProxyConfig config) {
+    private final int timeoutSec;
+
+    public IptvProxyService(IptvProxyConfig config) throws Exception {
         this.baseUrl = config.getBaseUrl();
         this.tokenSalt = config.getTokenSalt();
 
         this.allowAnonymous = config.getAllowAnonymous();
         this.allowedUsers = config.getUsers();
+
+        this.timeoutSec = config.getTimeoutSec();
 
         httpClient = HttpClient.newBuilder().build();
 
@@ -144,7 +148,7 @@ public class IptvProxyService implements HttpHandler {
 
                         IptvServerChannel serverChannel = serverChannelsByUrl.get(line);
                         if (serverChannel == null) {
-                            serverChannel = new IptvServerChannel(server, line, baseUrl + '/' + id, id, name, httpClient);
+                            serverChannel = new IptvServerChannel(server, line, baseUrl + '/' + id, id, name, httpClient, timeoutSec);
                         }
 
                         channel.addServerChannel(serverChannel);
@@ -171,9 +175,7 @@ public class IptvProxyService implements HttpHandler {
         try {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(5))
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .setHeader(Headers.KEEP_ALIVE.toString(), "false")
+                    .timeout(Duration.ofSeconds(timeoutSec))
                     .build();
 
             HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
