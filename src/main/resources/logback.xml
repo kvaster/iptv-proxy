@@ -1,25 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="false">
 
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${dir.log:-${dir.tmp:-.tmp}}/iptv-proxy.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${dir.log:-${dir.tmp:-.tmp}}/gsuite-sync.log.%d{yyyy-MM-dd}.gz</fileNamePattern>
-            <maxHistory>30</maxHistory>
-        </rollingPolicy>
+    <if condition='isDefined("dir.log")'>
+        <then>
 
-        <encoder>
-            <pattern>%d{dd.MM.yyyy HH:mm:ss} [%-5level] :: %thread \(%c{0}\) :: %m%n%ex</pattern>
-        </encoder>
-    </appender>
+            <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>${dir.log:-${dir.tmp:-.tmp}}/iptv-proxy.log</file>
+                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                    <fileNamePattern>${dir.log:-${dir.tmp:-.tmp}}/gsuite-sync.log.%d{yyyy-MM-dd}.gz</fileNamePattern>
+                    <maxHistory>30</maxHistory>
+                </rollingPolicy>
 
-    <logger name="com.kvaster" additivity="false">
-        <level value="info" />
-        <appender-ref ref="FILE" />
-    </logger>
+                <encoder>
+                    <pattern>%d{dd.MM.yyyy HH:mm:ss} [%-5level] :: %thread \(%c{0}\) :: %m%n%ex</pattern>
+                </encoder>
+            </appender>
 
-    <root level="error">
-        <appender-ref ref="FILE" />
-    </root>
+            <logger name="com.kvaster" additivity="false">
+                <level value="info" />
+                <appender-ref ref="FILE" />
+            </logger>
+
+            <root level="error">
+                <appender-ref ref="FILE" />
+            </root>
+
+        </then>
+        <else>
+
+            <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                <param name="target" value="System.out" />
+                <encoder>
+                    <pattern>%date{HH:mm:ss.SSS} [%-5level] :: %thread \(%class{0}\) :: %message%n</pattern>
+                    <charset>UTF-8</charset>
+                </encoder>
+            </appender>
+
+            <logger name="com.kvaster" additivity="false">
+                <level value="debug" />
+                <appender-ref ref="CONSOLE" />
+            </logger>
+
+            <root level="error">
+                <appender-ref ref="CONSOLE" />
+            </root>
+
+        </else>
+    </if>
 
 </configuration>
