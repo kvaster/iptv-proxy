@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="false">
 
-    <if condition='isDefined("dir.log")'>
+    <if condition='isDefined("log.dir")'>
         <then>
 
             <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <file>${dir.log:-${dir.tmp:-.tmp}}/iptv-proxy.log</file>
+                <file>${log.dir:-.}/iptv-proxy.log</file>
                 <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-                    <fileNamePattern>${dir.log:-${dir.tmp:-.tmp}}/gsuite-sync.log.%d{yyyy-MM-dd}.gz</fileNamePattern>
+                    <fileNamePattern>${log.dir:-.}/iptv-proxy.log.%d{yyyy-MM-dd}.gz</fileNamePattern>
                     <maxHistory>30</maxHistory>
                 </rollingPolicy>
 
@@ -17,7 +17,7 @@
             </appender>
 
             <logger name="com.kvaster" additivity="false">
-                <level value="info" />
+                <level value="${log.level:-info}" />
                 <appender-ref ref="FILE" />
             </logger>
 
@@ -37,7 +37,7 @@
             </appender>
 
             <logger name="com.kvaster" additivity="false">
-                <level value="debug" />
+                <level value="${log.level:-info}" />
                 <appender-ref ref="CONSOLE" />
             </logger>
 
