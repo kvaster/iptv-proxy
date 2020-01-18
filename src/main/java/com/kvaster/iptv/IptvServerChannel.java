@@ -96,6 +96,19 @@ public class IptvServerChannel {
         server.release();
     }
 
+    private HttpRequest.Builder createRequest(String url, IptvUser user) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(timeoutSec));
+
+        // send user id to next iptv-proxy
+        if (server.getSendUser()) {
+            builder.header(IptvServer.PROXY_USER_HEADER, user.getId());
+        }
+
+        return builder;
+    }
+
     public boolean handle(HttpServerExchange exchange, String path, IptvUser user, String token) {
         if ("channel.m3u8".equals(path)) {
             handleInfo(exchange, user, token);
@@ -117,10 +130,7 @@ public class IptvServerChannel {
 //                return true;
 //            }
                 exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-                    HttpRequest req = HttpRequest.newBuilder()
-                            .uri(URI.create(stream.url))
-                            .timeout(Duration.ofSeconds(timeoutSec))
-                            .build();
+                    HttpRequest req = createRequest(stream.url, user).build();
 
                     httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
                             .whenComplete((resp, err) -> {
@@ -147,16 +157,7 @@ public class IptvServerChannel {
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             LOG.info("Channel: {}, user: {}, url: {}", channelName, user.getId(), channelUrl);
 
-            HttpRequest.Builder builder = HttpRequest.newBuilder()
-                    .uri(URI.create(channelUrl))
-                    .timeout(Duration.ofSeconds(timeoutSec));
-
-            // send user id to next iptv-proxy
-            if (server.getSendUser()) {
-                builder.header(IptvServer.PROXY_USER_HEADER, user.getId());
-            }
-
-            HttpRequest req = builder.build();
+            HttpRequest req = createRequest(channelUrl, user).build();
 
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
                     .whenComplete((resp, err) -> {
