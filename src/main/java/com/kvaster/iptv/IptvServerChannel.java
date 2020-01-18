@@ -147,10 +147,16 @@ public class IptvServerChannel {
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             LOG.info("Channel: {}, user: {}, url: {}", channelName, user.getId(), channelUrl);
 
-            HttpRequest req = HttpRequest.newBuilder()
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(channelUrl))
-                    .timeout(Duration.ofSeconds(timeoutSec))
-                    .build();
+                    .timeout(Duration.ofSeconds(timeoutSec));
+
+            // send user id to next iptv-proxy
+            if (server.getSendUser()) {
+                builder.header(IptvServer.PROXY_USER_HEADER, user.getId());
+            }
+
+            HttpRequest req = builder.build();
 
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
                     .whenComplete((resp, err) -> {

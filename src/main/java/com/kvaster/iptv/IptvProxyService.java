@@ -70,7 +70,7 @@ public class IptvProxyService implements HttpHandler {
                 .build();
 
         List<IptvServer> ss = new ArrayList<>();
-        config.getServers().forEach((sc) -> ss.add(new IptvServer(sc.getName(), sc.getUrl(), sc.getMaxConnections())));
+        config.getServers().forEach((sc) -> ss.add(new IptvServer(sc.getName(), sc.getUrl(), sc.getMaxConnections(), sc.getSendUser())));
         servers = Collections.unmodifiableList(ss);
     }
 
@@ -230,6 +230,12 @@ public class IptvProxyService implements HttpHandler {
         // we need user if this is not m3u request
         String token = exchange.getQueryParameters().getOrDefault("t", new ArrayDeque<>()).peek();
         String user = getUserFromToken(token);
+
+        // pass user name from another iptv-proxy
+        String proxyUser = exchange.getRequestHeaders().getFirst(IptvServer.PROXY_USER_HEADER);
+        if (proxyUser != null) {
+            user = user + ':' + proxyUser;
+        }
 
         // no token, or user is not verified
         if (user == null) {
