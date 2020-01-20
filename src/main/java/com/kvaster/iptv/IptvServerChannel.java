@@ -82,17 +82,17 @@ public class IptvServerChannel {
         return channelId;
     }
 
-    public boolean acquire() {
+    public boolean acquire(String userId) {
         if (server.acquire()) {
-            LOG.info("Channel acquired: {} / {}", channelName, server.getName());
+            LOG.info("[{}] channel acquired: {} / {}", userId, channelName, server.getName());
             return true;
         }
 
         return false;
     }
 
-    public void release() {
-        LOG.info("Channel release: {} / {}", channelName, server.getName());
+    public void release(String userId) {
+        LOG.info("[{}] channel released: {} / {}", userId, channelName, server.getName());
         server.release();
     }
 
@@ -117,7 +117,8 @@ public class IptvServerChannel {
             Stream stream = streamMap.get(path);
 
             if (stream != null) {
-                LOG.info("Stream: {}, url: {}", user.getId(), stream.url);
+                final String rid = RequestCounter.next();
+                LOG.info("{}[{}] stream: {}", rid, user.getId(), stream.url);
 
                 // usually we expect that player will try not to decrease buffer size
                 // so we may expect that player will try to buffer more segments with durationMillis delay
@@ -134,12 +135,12 @@ public class IptvServerChannel {
 
                     httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
                             .whenComplete((resp, err) -> {
-                                if (HttpUtils.isOk(resp, err, exchange)) {
+                                if (HttpUtils.isOk(resp, err, exchange, rid)) {
                                     for (HttpString header : HEADERS) {
                                         resp.headers().firstValue(header.toString()).ifPresent(value -> exchange.getResponseHeaders().add(header, value));
                                     }
 
-                                    resp.body().subscribe(new IptvStream(exchange));
+                                    resp.body().subscribe(new IptvStream(exchange, rid));
                                 }
                             });
                 });
@@ -155,13 +156,14 @@ public class IptvServerChannel {
         user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSec + 1));
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-            LOG.info("Channel: {}, user: {}, url: {}", channelName, user.getId(), channelUrl);
+            String rid = RequestCounter.next();
+            LOG.info("{}[{}] channel: {}, url: {}", rid, user.getId(), channelName, channelUrl);
 
             HttpRequest req = createRequest(channelUrl, user).build();
 
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
                     .whenComplete((resp, err) -> {
-                        if (HttpUtils.isOk(resp, err, exchange)) {
+                        if (HttpUtils.isOk(resp, err, exchange, rid)) {
                             String[] info = resp.body().split("\n");
 
                             Digest digest = Digest.sha256();

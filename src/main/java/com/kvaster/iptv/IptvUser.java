@@ -23,7 +23,7 @@ public class IptvUser {
     public IptvUser(String id) {
         this.id = id;
 
-        LOG.info("User created: {}", id);
+        LOG.info("[{}] user created", id);
     }
 
     public void lock() {
@@ -68,11 +68,11 @@ public class IptvUser {
 
     public void onRemove() {
         if (serverChannel != null) {
-            serverChannel.release();
+            serverChannel.release(id);
             serverChannel = null;
         }
 
-        LOG.info("User removed: {}", id);
+        LOG.info("[{}] user removed", id);
     }
 
     public IptvServerChannel getServerChannel(IptvChannel channel) {
@@ -81,12 +81,12 @@ public class IptvUser {
                 return serverChannel;
             }
 
-            serverChannel.release();
+            serverChannel.release(id);
         }
 
         expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
 
-        serverChannel = channel.acquire();
+        serverChannel = channel.acquire(id);
 
         return serverChannel;
     }

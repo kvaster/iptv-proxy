@@ -37,14 +37,14 @@ public class IptvChannel {
         serverChannels.add(serverChannel);
     }
 
-    public IptvServerChannel acquire() {
+    public IptvServerChannel acquire(String userId) {
         for (IptvServerChannel sc : serverChannels) {
-            if (sc.acquire()) {
+            if (sc.acquire(userId)) {
                 return sc;
             }
         }
 
-        LOG.info("Can't acquire channel: {}", name);
+        LOG.info("[{}] can't acquire channel: {}", userId, name);
 
         return null;
     }

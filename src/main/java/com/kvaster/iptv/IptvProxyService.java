@@ -75,21 +75,21 @@ public class IptvProxyService implements HttpHandler {
     }
 
     public void startService() throws IOException {
-        LOG.info("Starting...");
+        LOG.info("starting");
 
         undertow.start();
         scheduleChannelsUpdate(1);
 
-        LOG.info("Started.");
+        LOG.info("started");
     }
 
     public void stopService() {
-        LOG.info("Stopping...");
+        LOG.info("stopping");
 
         timer.cancel();
         undertow.stop();
 
-        LOG.info("Stopped.");
+        LOG.info("stopped");
     }
 
     private void scheduleChannelsUpdate(long delay) {
@@ -109,7 +109,7 @@ public class IptvProxyService implements HttpHandler {
     }
 
     private boolean updateChannelsImpl() {
-        LOG.info("Updating channels...");
+        LOG.info("updating channels");
 
         Map<String, IptvChannel> chs = new HashMap<>();
         Map<String, IptvServerChannel> byUrl = new HashMap<>();
@@ -117,7 +117,7 @@ public class IptvProxyService implements HttpHandler {
         Digest digest = Digest.sha256();
 
         for (IptvServer server : servers) {
-            LOG.info("Loading playlist for: {}", server.getName());
+            LOG.info("loading playlist: {}", server.getName());
 
             String channels = loadChannels(server.getUrl());
             if (channels == null) {
@@ -140,7 +140,7 @@ public class IptvProxyService implements HttpHandler {
                     }
                 } else {
                     if (name == null) {
-                        LOG.warn("Skipping malformed channel: {}", line);
+                        LOG.warn("skipping malformed channel: {}", line);
                     } else {
                         String id = digest.digest(name);
                         final String _name = name;
@@ -166,7 +166,7 @@ public class IptvProxyService implements HttpHandler {
         channels = chs;
         serverChannelsByUrl = byUrl;
 
-        LOG.info("Channels updated.");
+        LOG.info("channels updated.");
 
         return true;
     }
@@ -181,14 +181,14 @@ public class IptvProxyService implements HttpHandler {
             HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
 
             if (resp.statusCode() != HttpURLConnection.HTTP_OK) {
-                LOG.error("Can't load playlist - status code is: {}", resp.statusCode());
+                LOG.error("can't load playlist - status code is: {}", resp.statusCode());
             } else {
                 return resp.body();
             }
         } catch (IOException ie) {
-            LOG.error("Can't load playlist - io error: {}", ie.getMessage());
+            LOG.error("can't load playlist - io error: {}", ie.getMessage());
         } catch (InterruptedException ie) {
-            LOG.error("Interrupted while loading playlist");
+            LOG.error("interrupted while loading playlist");
         }
 
         return null;

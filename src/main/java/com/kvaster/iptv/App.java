@@ -11,7 +11,7 @@ public class App {
 
     public static void main(String[] args) {
         try {
-            LOG.info("Loading config...");
+            LOG.info("loading config...");
 
             File configFile = new File(System.getProperty("config", "config.yml"));
 
@@ -22,7 +22,7 @@ public class App {
             Runtime.getRuntime().addShutdownHook(new Thread(service::stopService));
             service.startService();
         } catch (Exception e) {
-            LOG.error("error", e);
+            LOG.error("fatal error", e);
             System.exit(1);
         }
     }

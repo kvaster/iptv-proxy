@@ -29,14 +29,17 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     private static ByteBuffer END_MARKER = ByteBuffer.allocate(0);
     private static List<ByteBuffer> END_ARRAY_MARKER = Collections.singletonList(END_MARKER);
 
-    public IptvStream(HttpServerExchange exchange) {
+    private final String rid;
+
+    public IptvStream(HttpServerExchange exchange, String rid) {
         this.exchange = exchange;
+        this.rid = rid;
     }
 
     @Override
     public void onSubscribe(Subscription subscription) {
         if (this.subscription != null) {
-            LOG.error("Already subscribed");
+            LOG.error("{}already subscribed", rid);
             subscription.cancel();
             return;
         }
@@ -77,6 +80,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     private boolean sendNext(ByteBuffer b) {
         if (b == END_MARKER) {
             exchange.endExchange();
+            LOG.debug("{}write complete", rid);
             return true;
         }
 
@@ -92,7 +96,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
             @Override
             public void onException(HttpServerExchange exchange, Sender sender, IOException exception) {
-                LOG.warn("Error on sending stream");
+                LOG.warn("{}error on sending stream: {}", rid, exception.getMessage());
                 finish();
             }
         });
@@ -102,13 +106,13 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     @Override
     public void onError(Throwable throwable) {
-        LOG.warn("Error on loading stream", throwable);
+        LOG.warn("{}error on loading stream: {}", rid, throwable.getMessage());
         finish();
     }
 
     @Override
     public void onComplete() {
-        // LOG.info("onComplete");
+        LOG.debug("{} read complete", rid);
         finish();
     }
 }
