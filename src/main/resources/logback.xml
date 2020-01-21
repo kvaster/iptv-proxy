@@ -12,7 +12,7 @@
                 </rollingPolicy>
 
                 <encoder>
-                    <pattern>%d{dd.MM.yyyy HH:mm:ss} [%-5level] :: %c{0}\) :: %m%n%ex</pattern>
+                    <pattern>%d{dd.MM.yyyy HH:mm:ss} [%-5level] :: %c{0} :: %m%n%ex</pattern>
                 </encoder>
             </appender>
 
@@ -31,7 +31,7 @@
             <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
                 <param name="target" value="System.out" />
                 <encoder>
-                    <pattern>%d{dd.MM.yyyy HH:mm:ss} [%-5level] :: %c{0}\) :: %m%n%ex</pattern>
+                    <pattern>%d{dd.MM.yyyy HH:mm:ss} [%-5level] :: %c{0} :: %m%n%ex</pattern>
                     <charset>UTF-8</charset>
                 </encoder>
             </appender>
