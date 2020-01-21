@@ -112,7 +112,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     @Override
     public void onComplete() {
-        LOG.debug("{} read complete", rid);
+        LOG.debug("{}read complete", rid);
         finish();
     }
 }
