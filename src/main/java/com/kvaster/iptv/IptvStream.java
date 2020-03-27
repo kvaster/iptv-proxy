@@ -8,6 +8,7 @@ import java.util.Queue;
 import java.util.concurrent.Flow.Subscriber;
 import java.util.concurrent.Flow.Subscription;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.undertow.io.IoCallback;
@@ -31,9 +32,13 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     private final String rid;
 
+    private final SpeedMeter meter;
+
     public IptvStream(HttpServerExchange exchange, String rid) {
         this.exchange = exchange;
         this.rid = rid;
+
+        meter = new SpeedMeter(rid);
     }
 
     @Override
@@ -57,6 +62,12 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     @Override
     public void onNext(List<ByteBuffer> item) {
+        int len = 0;
+        for (ByteBuffer b : item) {
+            len += b.remaining();
+        }
+        meter.received(len);
+
         buffers.addAll(item);
 
         if (busy.compareAndSet(false, true)) {
@@ -113,6 +124,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     @Override
     public void onComplete() {
         LOG.debug("{}read complete", rid);
+        meter.finish();
         finish();
     }
 }
