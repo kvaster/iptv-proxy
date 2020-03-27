@@ -32,6 +32,10 @@ public class SpeedMeter {
     }
 
     public void received(long len) {
+        if (bytes == 0) {
+            LOG.debug("{}stream started", rid);
+        }
+
         bytes += len;
         partBytes += len;
 
