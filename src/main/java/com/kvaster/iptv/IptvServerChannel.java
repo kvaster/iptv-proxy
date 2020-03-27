@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +46,11 @@ public class IptvServerChannel {
             this.url = url;
             this.startTime = startTime;
             this.durationMillis = durationMillis;
+        }
+
+        @Override
+        public String toString() {
+            return "[url: " + url + ", start: " + new Date(startTime) + ", duration: " + (durationMillis / 1000) + "s]";
         }
     }
 
@@ -118,7 +124,7 @@ public class IptvServerChannel {
 
             if (stream != null) {
                 final String rid = RequestCounter.next();
-                LOG.info("{}[{}] stream: {}", rid, user.getId(), stream.url);
+                LOG.info("{}[{}] stream: {}", rid, user.getId(), stream);
 
                 // usually we expect that player will try not to decrease buffer size
                 // so we may expect that player will try to buffer more segments with durationMillis delay
@@ -171,6 +177,8 @@ public class IptvServerChannel {
 
                             Map<String, Stream> streamMap = new HashMap<>();
 
+                            long m3uStart = 0;
+
                             long durationMillis = 0;
                             long startTime = 0;
 
@@ -193,7 +201,7 @@ public class IptvServerChannel {
                                     } else if (l.startsWith(TAG_PROGRAM_DATE_TIME)) {
                                         try {
                                             ZonedDateTime dateTime = ZonedDateTime.parse(l.substring(TAG_PROGRAM_DATE_TIME.length()), DateTimeFormatter.ISO_DATE_TIME);
-                                            startTime = dateTime.toInstant().toEpochMilli();
+                                            m3uStart = startTime = dateTime.toInstant().toEpochMilli();
                                         } catch (Exception e) {
                                             // do nothing
                                         }
@@ -215,6 +223,8 @@ public class IptvServerChannel {
                             exchange.getResponseHeaders().add(Headers.CONTENT_TYPE, "application/vnd.apple.mpegurl");
                             exchange.getResponseSender().send(sb.toString());
                             exchange.endExchange();
+
+                            LOG.info("{}m3u start: {}, end: {}", rid, new Date(m3uStart), new Date(startTime));
                         }
                     });
         });
