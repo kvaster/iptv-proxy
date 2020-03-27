@@ -11,6 +11,7 @@ public class IptvServerConfig {
     }
 
     public IptvServerConfig(String name, String url, int maxConnections, boolean sendUser) {
+        this.name = name;
         this.url = url;
         this.maxConnections = maxConnections;
         this.sendUser = sendUser;
