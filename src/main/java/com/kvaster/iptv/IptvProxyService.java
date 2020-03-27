@@ -62,7 +62,9 @@ public class IptvProxyService implements HttpHandler {
 
         this.timeoutSec = config.getTimeoutSec();
 
-        httpClient = HttpClient.newBuilder().build();
+        httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .build();
 
         undertow = Undertow.builder()
                 .addHttpListener(config.getPort(), config.getHost())
