@@ -7,14 +7,16 @@ public class IptvServer {
     private final String url;
     private final int maxConnections;
     private final boolean sendUser;
+    private final boolean proxyStream;
 
     private int acquired;
 
-    public IptvServer(String name, String url, int maxConnections, boolean sendUser) {
+    public IptvServer(String name, String url, int maxConnections, boolean sendUser, boolean proxyStream) {
         this.name = name;
         this.url = url;
         this.maxConnections = maxConnections;
         this.sendUser = sendUser;
+        this.proxyStream = proxyStream;
     }
 
     public String getName() {
@@ -27,6 +29,10 @@ public class IptvServer {
 
     public boolean getSendUser() {
         return sendUser;
+    }
+
+    public boolean getProxyStream() {
+        return proxyStream;
     }
 
     public synchronized boolean acquire() {

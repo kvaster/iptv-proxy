@@ -19,6 +19,7 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import io.undertow.util.SameThreadExecutor;
+import io.undertow.util.StatusCodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,12 +131,14 @@ public class IptvServerChannel {
                 // so we may expect that player will try to buffer more segments with durationMillis delay
                 user.setExpireTime(System.currentTimeMillis() + stream.durationMillis * 2 + 1000);
 
-//            if (true) {
-//                exchange.setStatusCode(StatusCodes.FOUND);
-//                exchange.getResponseHeaders().add(Headers.LOCATION, streamUrl);
-//                exchange.endExchange();
-//                return true;
-//            }
+                if (!server.getProxyStream()) {
+                    LOG.info("{}redirecting stream to direct url", rid);
+                    exchange.setStatusCode(StatusCodes.FOUND);
+                    exchange.getResponseHeaders().add(Headers.LOCATION, stream.url);
+                    exchange.endExchange();
+                    return true;
+                }
+
                 exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
                     HttpRequest req = createRequest(stream.url, user).build();
 

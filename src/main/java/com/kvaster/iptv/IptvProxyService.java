@@ -72,7 +72,7 @@ public class IptvProxyService implements HttpHandler {
                 .build();
 
         List<IptvServer> ss = new ArrayList<>();
-        config.getServers().forEach((sc) -> ss.add(new IptvServer(sc.getName(), sc.getUrl(), sc.getMaxConnections(), sc.getSendUser())));
+        config.getServers().forEach((sc) -> ss.add(new IptvServer(sc.getName(), sc.getUrl(), sc.getMaxConnections(), sc.getSendUser(), sc.getProxyStream())));
         servers = Collections.unmodifiableList(ss);
     }
 
