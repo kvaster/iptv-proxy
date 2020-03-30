@@ -6,17 +6,22 @@ public class IptvServerConfig {
     private int maxConnections;
     private boolean sendUser;
     private boolean proxyStream = true;
+    private long channelFailedMs;
 
     protected IptvServerConfig() {
         // for deserialization
     }
 
-    public IptvServerConfig(String name, String url, int maxConnections, boolean sendUser, boolean proxyStream) {
+    public IptvServerConfig(
+            String name, String url, int maxConnections,
+            boolean sendUser, boolean proxyStream,
+            long channelFailedMs) {
         this.name = name;
         this.url = url;
         this.maxConnections = maxConnections;
         this.sendUser = sendUser;
         this.proxyStream = proxyStream;
+        this.channelFailedMs = channelFailedMs;
     }
 
     public String getName() {
@@ -37,5 +42,9 @@ public class IptvServerConfig {
 
     public boolean getProxyStream() {
         return proxyStream;
+    }
+
+    public long getChannelFailedMs() {
+        return channelFailedMs;
     }
 }

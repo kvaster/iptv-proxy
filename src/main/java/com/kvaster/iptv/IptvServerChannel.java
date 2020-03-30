@@ -38,6 +38,8 @@ public class IptvServerChannel {
     private final HttpClient httpClient;
     private final int timeoutSec;
 
+    private volatile long failedUntil;
+
     private static class Stream {
         String url;
         long startTime;
@@ -90,6 +92,10 @@ public class IptvServerChannel {
     }
 
     public boolean acquire(String userId) {
+        if (System.currentTimeMillis() < failedUntil) {
+            return false;
+        }
+
         if (server.acquire()) {
             LOG.info("[{}] channel acquired: {} / {}", userId, channelName, server.getName());
             return true;
@@ -228,6 +234,17 @@ public class IptvServerChannel {
                             exchange.endExchange();
 
                             LOG.info("{}m3u start: {}, end: {}", rid, new Date(m3uStart), new Date(startTime));
+                        } else {
+                            if (server.getChannelFailedMs() > 0) {
+                                user.lock();
+                                try {
+                                    LOG.warn("{}channel failed", rid);
+                                    failedUntil = System.currentTimeMillis() + server.getChannelFailedMs();
+                                    user.onRemove();
+                                } finally {
+                                    user.unlock();
+                                }
+                            }
                         }
                     });
         });

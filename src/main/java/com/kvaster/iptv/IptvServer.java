@@ -1,5 +1,7 @@
 package com.kvaster.iptv;
 
+import com.kvaster.iptv.config.IptvServerConfig;
+
 public class IptvServer {
     public static final String PROXY_USER_HEADER = "iptv-proxy-user";
 
@@ -8,15 +10,23 @@ public class IptvServer {
     private final int maxConnections;
     private final boolean sendUser;
     private final boolean proxyStream;
+    private final long channelFailedMs;
 
     private int acquired;
 
-    public IptvServer(String name, String url, int maxConnections, boolean sendUser, boolean proxyStream) {
+    public IptvServer(IptvServerConfig sc) {
+        this(sc.getName(), sc.getUrl(), sc.getMaxConnections(), sc.getSendUser(), sc.getProxyStream(), sc.getChannelFailedMs());
+    }
+
+    public IptvServer(String name, String url, int maxConnections,
+            boolean sendUser, boolean proxyStream,
+            long channelFailedMs) {
         this.name = name;
         this.url = url;
         this.maxConnections = maxConnections;
         this.sendUser = sendUser;
         this.proxyStream = proxyStream;
+        this.channelFailedMs = channelFailedMs;
     }
 
     public String getName() {
@@ -33,6 +43,10 @@ public class IptvServer {
 
     public boolean getProxyStream() {
         return proxyStream;
+    }
+
+    public long getChannelFailedMs() {
+        return channelFailedMs;
     }
 
     public synchronized boolean acquire() {

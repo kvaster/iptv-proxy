@@ -1,7 +1,9 @@
 package com.kvaster.iptv;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +14,8 @@ public class IptvChannel {
     private final String id;
     private final String name;
     private final String[] info;
+
+    private final Random rand = new Random();
 
     private List<IptvServerChannel> serverChannels = new ArrayList<>();
 
@@ -38,7 +42,10 @@ public class IptvChannel {
     }
 
     public IptvServerChannel acquire(String userId) {
-        for (IptvServerChannel sc : serverChannels) {
+        List<IptvServerChannel> scs = new ArrayList<>(serverChannels);
+        Collections.shuffle(scs, rand);
+
+        for (IptvServerChannel sc : scs) {
             if (sc.acquire(userId)) {
                 return sc;
             }
