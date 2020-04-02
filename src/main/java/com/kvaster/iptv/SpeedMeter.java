@@ -31,7 +31,7 @@ public class SpeedMeter {
         this.time = this.partTime = getMonotonicMillis();
     }
 
-    public void received(long len) {
+    public void processed(long len) {
         if (bytes == 0) {
             LOG.debug("{}stream started", rid);
         }

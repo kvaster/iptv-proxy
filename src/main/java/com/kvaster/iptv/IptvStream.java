@@ -8,7 +8,6 @@ import java.util.Queue;
 import java.util.concurrent.Flow.Subscriber;
 import java.util.concurrent.Flow.Subscription;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.undertow.io.IoCallback;
@@ -32,13 +31,15 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     private final String rid;
 
-    private final SpeedMeter meter;
+    private final SpeedMeter readMeter;
+    private final SpeedMeter writeMeter;
 
     public IptvStream(HttpServerExchange exchange, String rid) {
         this.exchange = exchange;
         this.rid = rid;
 
-        meter = new SpeedMeter(rid);
+        readMeter = new SpeedMeter(rid + ":r");
+        writeMeter = new SpeedMeter(rid + ":w");
     }
 
     @Override
@@ -66,7 +67,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
         for (ByteBuffer b : item) {
             len += b.remaining();
         }
-        meter.received(len);
+        readMeter.processed(len);
 
         buffers.addAll(item);
 
@@ -92,14 +93,18 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
         if (b == END_MARKER) {
             exchange.endExchange();
             LOG.debug("{}write complete", rid);
+            writeMeter.finish();
             return true;
         }
 
         AtomicBoolean completed = new AtomicBoolean(false);
 
+        final int len = b.remaining();
         exchange.getResponseSender().send(b, new IoCallback() {
             @Override
             public void onComplete(HttpServerExchange exchange, Sender sender) {
+                writeMeter.processed(len);
+
                 if (!completed.compareAndSet(false, true)) {
                     sendNext();
                 }
@@ -124,7 +129,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     @Override
     public void onComplete() {
         LOG.debug("{}read complete", rid);
-        meter.finish();
+        readMeter.finish();
         finish();
     }
 }
