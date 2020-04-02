@@ -33,7 +33,7 @@ public class SpeedMeter {
 
     public void processed(long len) {
         if (bytes == 0) {
-            LOG.debug("{}stream started", rid);
+            LOG.debug("{}start", rid);
         }
 
         bytes += len;
@@ -58,7 +58,7 @@ public class SpeedMeter {
         long now = getMonotonicMillis();
         long delta = Math.max(1, now - partTime);
 
-        LOG.debug("{}received {}, speed: {}/s", rid, format(partBytes), format(partBytes * 1000 / delta));
+        LOG.debug("{}progress: {} speed: {}/s", rid, format(partBytes), format(partBytes * 1000 / delta));
         partTime = now;
         partBytes = 0;
     }

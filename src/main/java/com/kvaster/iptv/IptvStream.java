@@ -38,8 +38,8 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
         this.exchange = exchange;
         this.rid = rid;
 
-        readMeter = new SpeedMeter(rid + ":r");
-        writeMeter = new SpeedMeter(rid + ":w");
+        readMeter = new SpeedMeter(rid + "read: ");
+        writeMeter = new SpeedMeter(rid + "write: ");
     }
 
     @Override
@@ -92,7 +92,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     private boolean sendNext(ByteBuffer b) {
         if (b == END_MARKER) {
             exchange.endExchange();
-            LOG.debug("{}write complete", rid);
+            //LOG.debug("{}write complete", rid);
             writeMeter.finish();
             return true;
         }
@@ -128,7 +128,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     @Override
     public void onComplete() {
-        LOG.debug("{}read complete", rid);
+        //LOG.debug("{}read complete", rid);
         readMeter.finish();
         finish();
     }
