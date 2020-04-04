@@ -31,7 +31,7 @@ public class IptvServerChannel {
 
     private final IptvServer server;
     private final String channelUrl;
-    private final String baseUrl;
+    private final BaseUrl baseUrl;
     private final String channelId;
     private final String channelName;
 
@@ -74,7 +74,7 @@ public class IptvServerChannel {
     };
 
     public IptvServerChannel(
-            IptvServer server, String channelUrl, String baseUrl, String channelId, String channelName,
+            IptvServer server, String channelUrl, BaseUrl baseUrl, String channelId, String channelName,
             HttpClient httpClient, int timeoutSec
     ) {
         this.server = server;
@@ -220,7 +220,7 @@ public class IptvServerChannel {
                                 } else {
                                     String path = digest.digest(l) + ".ts";
                                     streamMap.put(path, new Stream(l, startTime, durationMillis));
-                                    sb.append(baseUrl).append('/').append(path).append("?t=").append(token).append("\n");
+                                    sb.append(baseUrl.getBaseUrl(exchange)).append('/').append(path).append("?t=").append(token).append("\n");
 
                                     startTime = durationMillis == 0 ? 0 : startTime + durationMillis;
                                     durationMillis = 0;

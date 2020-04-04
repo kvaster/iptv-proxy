@@ -9,6 +9,7 @@ public class IptvProxyConfig {
     private String host = "127.0.0.1";
     private int port = 8080;
     private String baseUrl;
+    private String forwardedPass;
     private String tokenSalt;
     private List<IptvServerConfig> servers;
     private boolean allowAnonymous = true;
@@ -20,12 +21,14 @@ public class IptvProxyConfig {
     }
 
     public IptvProxyConfig(
-            String host, int port, String baseUrl, String tokenSalt, List<IptvServerConfig> servers,
+            String host, int port, String baseUrl, String forwardedPass,
+            String tokenSalt, List<IptvServerConfig> servers,
             boolean allowAnonymous, Set<String> users, int timeoutSec
     ) {
         this.host = host;
         this.port = port;
         this.baseUrl = baseUrl;
+        this.forwardedPass = forwardedPass;
         this.tokenSalt = tokenSalt;
         this.servers = new ArrayList<>(servers);
         this.allowAnonymous = allowAnonymous;
@@ -43,6 +46,10 @@ public class IptvProxyConfig {
 
     public String getBaseUrl() {
         return baseUrl;
+    }
+
+    public String getForwardedPass() {
+        return forwardedPass;
     }
 
     public String getTokenSalt() {

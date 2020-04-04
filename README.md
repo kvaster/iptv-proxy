@@ -14,6 +14,7 @@ allocated to active tv.
 host: 127.0.0.1
 port: 8080
 base_url: http://127.0.0.1:8080
+forwarded_pass: password
 token_salt: 6r8bt67ta5e87tg7afn
 timeout_sec: 30
 servers:
@@ -24,21 +25,38 @@ servers:
     url: https://iptv-proxy.example.com/playlist.m3u
     max_connections: 4
     send_user: true
+    proxy_stream: true
+    channel_failed_ms: 1000
 allow_anonymous: false
 users:
   - 65182_login1
   - 97897_login2
 ```
 
-* `base_url` - url of your service
+* `base_url` - url of your service, you may omit this (see forwarded_pass)
+* `forwarded_pass` - password for Forwarded header in case iptvproxy is behind proxy
 * `token_salt` - just random chars, they are used to create encrypted tokens
 * `max_connections` - max active connections allowed for this playlist
 * `send_user` - this is useful only when you're using cascade config - iptv-proxy behind iptv-proxy.
 If 'true' then iptv-proxy will send current user name in special http header.
 We need this to identify device (endpoint) - this will help us to handle max connections and
 channel switching properly.
+* `proxy_stream` - true (default) means proxy all data through own server,
+false means using direct urls for data
+* `channel_failed_ms` - on channel failure (error on downloading current m3u8 info)
+it will be marked as 'failed' for some time and will be not used for any subsequent requests.
+This feature should be enabled for last iptvproxy in chain (the one which connects to your iptv service)
+and should be disabled in other situation 
 * `allow_anonymous` - allow to connect any device without specific user name.
 It is not good idea to use such setup. You really should add name for each device you're using.
+
+iptv proxy will embed full urls in it's lists - it means we should now url from which service is accessed by user.
+Url is calculated in following way:
+* if forwarded_pass is enabled url is taken from Forwarded header
+(nginx setup: `proxy_set_header Forwarded "pass=PASS;baseUrl=https://$host";`).
+Password must match setting in iptvproxy config
+* base_url is used in case it defined
+* schema host and port from request is used (will not work in case iptvproxy is behind proxy)
 
 ## Device setup
 

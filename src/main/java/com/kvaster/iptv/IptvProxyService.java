@@ -37,7 +37,7 @@ public class IptvProxyService implements HttpHandler {
     private final Undertow undertow;
     private final Timer timer = new Timer();
 
-    private final String baseUrl;
+    private final BaseUrl baseUrl;
     private final String tokenSalt;
 
     private final AtomicLong idCounter = new AtomicLong(System.currentTimeMillis());
@@ -54,7 +54,8 @@ public class IptvProxyService implements HttpHandler {
     private final int timeoutSec;
 
     public IptvProxyService(IptvProxyConfig config) throws Exception {
-        this.baseUrl = config.getBaseUrl();
+        baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
+
         this.tokenSalt = config.getTokenSalt();
 
         this.allowAnonymous = config.getAllowAnonymous();
@@ -150,7 +151,7 @@ public class IptvProxyService implements HttpHandler {
 
                         IptvServerChannel serverChannel = serverChannelsByUrl.get(line);
                         if (serverChannel == null) {
-                            serverChannel = new IptvServerChannel(server, line, baseUrl + '/' + id, id, name, httpClient, timeoutSec);
+                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, httpClient, timeoutSec);
                         }
 
                         channel.addServerChannel(serverChannel);
@@ -341,7 +342,7 @@ public class IptvProxyService implements HttpHandler {
             for (String i : ch.getInfo()) {
                 sb.append(i).append("\n");
             }
-            sb.append(baseUrl).append('/').append(ch.getId()).append("/channel.m3u8?t=").append(token).append("\n");
+            sb.append(baseUrl.getBaseUrl(exchange)).append('/').append(ch.getId()).append("/channel.m3u8?t=").append(token).append("\n");
         });
 
         exchange.getResponseSender().send(sb.toString());
