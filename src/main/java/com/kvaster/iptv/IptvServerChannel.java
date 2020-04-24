@@ -74,8 +74,8 @@ public class IptvServerChannel {
     };
 
     public IptvServerChannel(
-            IptvServer server, String channelUrl, BaseUrl baseUrl, String channelId, String channelName,
-            HttpClient httpClient, int timeoutSec
+            IptvServer server, String channelUrl, BaseUrl baseUrl,
+            String channelId, String channelName, int timeoutSec
     ) {
         this.server = server;
         this.channelUrl = channelUrl;
@@ -83,7 +83,7 @@ public class IptvServerChannel {
         this.channelId = channelId;
         this.channelName = channelName;
 
-        this.httpClient = httpClient;
+        this.httpClient = server.getHttpClient();
         this.timeoutSec = timeoutSec;
     }
 

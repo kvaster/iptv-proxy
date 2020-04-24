@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 public class IptvProxyService implements HttpHandler {
     private static final Logger LOG = LoggerFactory.getLogger(IptvProxyService.class);
 
-    private final HttpClient httpClient;
     private final Undertow undertow;
     private final Timer timer = new Timer();
 
@@ -62,10 +61,6 @@ public class IptvProxyService implements HttpHandler {
         this.allowedUsers = config.getUsers();
 
         this.timeoutSec = config.getTimeoutSec();
-
-        httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.ALWAYS)
-                .build();
 
         undertow = Undertow.builder()
                 .addHttpListener(config.getPort(), config.getHost())
@@ -122,7 +117,7 @@ public class IptvProxyService implements HttpHandler {
         for (IptvServer server : servers) {
             LOG.info("loading playlist: {}", server.getName());
 
-            String channels = loadChannels(server.getUrl());
+            String channels = loadChannels(server.getUrl(), server.getHttpClient());
             if (channels == null) {
                 return false;
             }
@@ -151,7 +146,7 @@ public class IptvProxyService implements HttpHandler {
 
                         IptvServerChannel serverChannel = serverChannelsByUrl.get(line);
                         if (serverChannel == null) {
-                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, httpClient, timeoutSec);
+                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, timeoutSec);
                         }
 
                         channel.addServerChannel(serverChannel);
@@ -174,7 +169,7 @@ public class IptvProxyService implements HttpHandler {
         return true;
     }
 
-    private String loadChannels(String url) {
+    private String loadChannels(String url, HttpClient httpClient) {
         try {
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))

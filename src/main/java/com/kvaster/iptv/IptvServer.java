@@ -1,5 +1,7 @@
 package com.kvaster.iptv;
 
+import java.net.http.HttpClient;
+
 import com.kvaster.iptv.config.IptvServerConfig;
 
 public class IptvServer {
@@ -11,6 +13,8 @@ public class IptvServer {
     private final boolean sendUser;
     private final boolean proxyStream;
     private final long channelFailedMs;
+
+    private final HttpClient httpClient;
 
     private int acquired;
 
@@ -27,6 +31,14 @@ public class IptvServer {
         this.sendUser = sendUser;
         this.proxyStream = proxyStream;
         this.channelFailedMs = channelFailedMs;
+
+        httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .build();
+    }
+
+    public HttpClient getHttpClient() {
+        return httpClient;
     }
 
     public String getName() {
