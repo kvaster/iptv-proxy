@@ -87,6 +87,11 @@ public class IptvServerChannel {
         this.timeoutSec = timeoutSec;
     }
 
+    @Override
+    public String toString() {
+        return "[name: " + channelName + ", server: " + server.getName() + "]";
+    }
+
     public String getChannelId() {
         return channelId;
     }
