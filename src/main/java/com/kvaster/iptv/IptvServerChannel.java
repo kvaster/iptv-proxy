@@ -9,9 +9,13 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 import com.kvaster.utils.digest.Digest;
@@ -38,22 +42,28 @@ public class IptvServerChannel {
     private final HttpClient httpClient;
     private final int timeoutSec;
 
+    private final Timer timer;
+
     private volatile long failedUntil;
 
     private static class Stream {
+        String path;
         String url;
+        String header;
         long startTime;
         long durationMillis;
 
-        Stream(String url, long startTime, long durationMillis) {
+        Stream(String path, String url, String header, long startTime, long durationMillis) {
+            this.path = path;
             this.url = url;
+            this.header = header;
             this.startTime = startTime;
             this.durationMillis = durationMillis;
         }
 
         @Override
         public String toString() {
-            return "[url: " + url + ", start: " + new Date(startTime) + ", duration: " + (durationMillis / 1000) + "s]";
+            return "[path: " + path + ", url: " + url + ", start: " + new Date(startTime) + ", duration: " + (durationMillis / 1000) + "s]";
         }
     }
 
@@ -75,7 +85,8 @@ public class IptvServerChannel {
 
     public IptvServerChannel(
             IptvServer server, String channelUrl, BaseUrl baseUrl,
-            String channelId, String channelName, int timeoutSec
+            String channelId, String channelName, int timeoutSec,
+            Timer timer
     ) {
         this.server = server;
         this.channelUrl = channelUrl;
@@ -85,6 +96,8 @@ public class IptvServerChannel {
 
         this.httpClient = server.getHttpClient();
         this.timeoutSec = timeoutSec;
+
+        this.timer = timer;
     }
 
     @Override
@@ -172,73 +185,173 @@ public class IptvServerChannel {
         return false;
     }
 
+    ////////////////////////////////////////////////////////////////
+
+    private static class Streams {
+        List<Stream> streams = new ArrayList<>();
+        long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
+    }
+
+    private interface StreamsConsumer {
+        void onInfo(Streams streams, int statusCode);
+    }
+
+    private List<StreamsConsumer> streamsConsumers = new ArrayList<>();
+    private Streams streams;
+
+    private synchronized List<StreamsConsumer> getAndClearStreamsConsumers() {
+        List<StreamsConsumer> cs = streamsConsumers;
+        streamsConsumers = new ArrayList<>();
+        return cs;
+    }
+
     private void handleInfo(HttpServerExchange exchange, IptvUser user, String token) {
         user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSec + 1));
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             String rid = RequestCounter.next();
             LOG.info("{}[{}] channel: {}, url: {}", rid, user.getId(), channelName, channelUrl);
+            loadCachedInfo((streams, statusCode) -> {
+                if (streams == null) {
+                    LOG.warn("{}[{}] error loading streams info: {}", rid, user.getId(), statusCode);
 
-            HttpRequest req = createRequest(channelUrl, user).build();
+                    exchange.setStatusCode(statusCode);
+                    exchange.getResponseSender().send("error");
+                } else {
+                    LOG.info("{}[{}] ok", rid, user.getId());
 
-            httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                    .whenComplete((resp, err) -> {
-                        if (HttpUtils.isOk(resp, err, exchange, rid)) {
-                            String[] info = resp.body().split("\n");
+                    StringBuilder sb = new StringBuilder();
 
-                            Digest digest = Digest.sha256();
-                            StringBuilder sb = new StringBuilder();
+                    streams.streams.forEach(s -> sb
+                            .append(s.header)
+                            .append(baseUrl.getBaseUrl(exchange))
+                            .append('/').append(s.path).append("?t=").append(token).append("\n")
+                    );
 
-                            Map<String, Stream> streamMap = new HashMap<>();
+                    exchange.setStatusCode(HttpURLConnection.HTTP_OK);
+                    exchange.getResponseHeaders().add(Headers.CONTENT_TYPE, "application/vnd.apple.mpegurl");
+                    exchange.getResponseSender().send(sb.toString());
+                    exchange.endExchange();
+                }
+            }, user);
+        });
+    }
 
-                            long m3uStart = 0;
+    // TODO we must get rid of user info here
+    // what happens - we'll be loading stream info on behalf of specific user, but what we should really do
+    // is to keep per-channel connection. Probably we should have some way to mark channel as free
+    // without timeouts
+    private void loadCachedInfo(StreamsConsumer consumer, IptvUser user) {
+        Streams s = null;
+        boolean startReq = false;
 
-                            long durationMillis = 0;
-                            long startTime = 0;
+        synchronized (this) {
+            if (streams != null && System.currentTimeMillis() < streams.expireTime) {
+                s = streams;
+            } else {
+                streams = null;
+                startReq = streamsConsumers.size() == 0;
+                streamsConsumers.add(consumer);
+            }
+        }
 
-                            for (String l : info) {
-                                l = l.trim();
+        if (startReq) {
+            loadInfo(
+                    RequestCounter.next(),
+                    0,
+                    System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getRetryTimeoutSec()),
+                    user
+            );
+        } else if (s != null) {
+            consumer.onInfo(s, 0);
+        }
+    }
 
-                                if (l.startsWith("#")) {
-                                    if (l.startsWith(TAG_EXTINF)) {
-                                        String v = l.substring(TAG_EXTINF.length());
-                                        int idx = v.indexOf(',');
-                                        if (idx >= 0) {
-                                            v = v.substring(0, idx);
-                                        }
+    // TODO we must get rid of user info here
+    private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user) {
+        HttpRequest req = createRequest(channelUrl, user).build();
 
-                                        try {
-                                            durationMillis = new BigDecimal(v).multiply(new BigDecimal(1000)).longValue();
-                                        } catch (NumberFormatException e) {
-                                            // do nothing
-                                        }
-                                    } else if (l.startsWith(TAG_PROGRAM_DATE_TIME)) {
-                                        try {
-                                            ZonedDateTime dateTime = ZonedDateTime.parse(l.substring(TAG_PROGRAM_DATE_TIME.length()), DateTimeFormatter.ISO_DATE_TIME);
-                                            m3uStart = startTime = dateTime.toInstant().toEpochMilli();
-                                        } catch (Exception e) {
-                                            // do nothing
-                                        }
+        LOG.info("{}loading channel: {}, url: {}, retry: {}", rid, channelName, channelUrl, retryNo);
+
+        httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .whenComplete((resp, err) -> {
+                    if (HttpUtils.isOk(resp, err, rid)) {
+                        String[] info = resp.body().split("\n");
+
+                        Digest digest = Digest.sha256();
+                        StringBuilder sb = new StringBuilder();
+
+                        Map<String, Stream> streamMap = new HashMap<>();
+                        Streams streams = new Streams();
+
+                        long m3uStart = 0;
+
+                        long durationMillis = 0;
+                        long startTime = 0;
+
+                        for (String l : info) {
+                            l = l.trim();
+
+                            if (l.startsWith("#")) {
+                                if (l.startsWith(TAG_EXTINF)) {
+                                    String v = l.substring(TAG_EXTINF.length());
+                                    int idx = v.indexOf(',');
+                                    if (idx >= 0) {
+                                        v = v.substring(0, idx);
                                     }
 
-                                    sb.append(l).append("\n");
-                                } else {
-                                    String path = digest.digest(l) + ".ts";
-                                    streamMap.put(path, new Stream(l, startTime, durationMillis));
-                                    sb.append(baseUrl.getBaseUrl(exchange)).append('/').append(path).append("?t=").append(token).append("\n");
-
-                                    startTime = durationMillis == 0 ? 0 : startTime + durationMillis;
-                                    durationMillis = 0;
+                                    try {
+                                        durationMillis = new BigDecimal(v).multiply(new BigDecimal(1000)).longValue();
+                                    } catch (NumberFormatException e) {
+                                        // do nothing
+                                    }
+                                } else if (l.startsWith(TAG_PROGRAM_DATE_TIME)) {
+                                    try {
+                                        ZonedDateTime dateTime = ZonedDateTime.parse(l.substring(TAG_PROGRAM_DATE_TIME.length()), DateTimeFormatter.ISO_DATE_TIME);
+                                        m3uStart = startTime = dateTime.toInstant().toEpochMilli();
+                                    } catch (Exception e) {
+                                        // do nothing
+                                    }
                                 }
+
+                                sb.append(l).append("\n");
+                            } else {
+                                String path = digest.digest(l) + ".ts";
+                                Stream s = new Stream(path, l, sb.toString(), startTime, durationMillis);
+                                streamMap.put(path, s);
+                                streams.streams.add(s);
+
+                                sb = new StringBuilder();
+
+                                startTime = durationMillis == 0 ? 0 : startTime + durationMillis;
+                                // cache until end of life of current segment
+                                streams.expireTime = Math.max(streams.expireTime, startTime);
+                                durationMillis = 0;
                             }
+                        }
 
+                        List<StreamsConsumer> cs;
+
+                        synchronized (this) {
                             this.streamMap = streamMap;
-                            exchange.setStatusCode(HttpURLConnection.HTTP_OK);
-                            exchange.getResponseHeaders().add(Headers.CONTENT_TYPE, "application/vnd.apple.mpegurl");
-                            exchange.getResponseSender().send(sb.toString());
-                            exchange.endExchange();
+                            this.streams = streams;
 
-                            LOG.info("{}m3u start: {}, end: {}", rid, new Date(m3uStart), new Date(startTime));
+                            cs = getAndClearStreamsConsumers();
+                        }
+
+                        cs.forEach(c -> c.onInfo(streams, -1));
+
+                        LOG.info("{}m3u start: {}, end: {}", rid, new Date(m3uStart), new Date(startTime));
+                    } else {
+                        if (System.currentTimeMillis() < expireTime) {
+                            LOG.info("{}will retry", rid);
+
+                            timer.schedule(new TimerTask() {
+                                @Override
+                                public void run() {
+                                    loadInfo(rid, retryNo + 1, expireTime, user);
+                                }
+                            }, server.getRetryDelayMs());
                         } else {
                             if (server.getChannelFailedMs() > 0) {
                                 user.lock();
@@ -249,9 +362,14 @@ public class IptvServerChannel {
                                 } finally {
                                     user.unlock();
                                 }
+                            } else {
+                                LOG.warn("{}streams failed", rid);
                             }
+
+                            int statusCode = resp == null ? HttpURLConnection.HTTP_INTERNAL_ERROR : resp.statusCode();
+                            getAndClearStreamsConsumers().forEach(c -> c.onInfo(null, statusCode));
                         }
-                    });
-        });
+                    }
+                });
     }
 }

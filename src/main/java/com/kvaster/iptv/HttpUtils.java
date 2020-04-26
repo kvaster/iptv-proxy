@@ -10,6 +10,10 @@ import org.slf4j.LoggerFactory;
 public class HttpUtils {
     private static final Logger LOG = LoggerFactory.getLogger(HttpUtils.class);
 
+    public static boolean isOk(HttpResponse<?> resp, Throwable err, String rid) {
+        return isOk(resp, err, null, rid);
+    }
+
     public static boolean isOk(HttpResponse<?> resp, Throwable err, HttpServerExchange exchange, String rid) {
         if (resp == null) {
             LOG.warn(rid + "io error", err);
@@ -26,7 +30,7 @@ public class HttpUtils {
             }
             return false;
         } else {
-            LOG.debug("{} ok", rid);
+            LOG.debug("{}ok", rid);
         }
 
         return true;

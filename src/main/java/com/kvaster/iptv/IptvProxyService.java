@@ -146,7 +146,7 @@ public class IptvProxyService implements HttpHandler {
 
                         IptvServerChannel serverChannel = serverChannelsByUrl.get(line);
                         if (serverChannel == null) {
-                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, timeoutSec);
+                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, timeoutSec, timer);
                         }
 
                         channel.addServerChannel(serverChannel);

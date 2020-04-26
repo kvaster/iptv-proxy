@@ -7,6 +7,8 @@ public class IptvServerConfig {
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
+    private long retryTimeoutSec;
+    private long retryDelayMs;
 
     protected IptvServerConfig() {
         // for deserialization
@@ -15,13 +17,17 @@ public class IptvServerConfig {
     public IptvServerConfig(
             String name, String url, int maxConnections,
             boolean sendUser, boolean proxyStream,
-            long channelFailedMs) {
+            long channelFailedMs,
+            long retryTimeoutSec,
+            long retryDelayMs) {
         this.name = name;
         this.url = url;
         this.maxConnections = maxConnections;
         this.sendUser = sendUser;
         this.proxyStream = proxyStream;
         this.channelFailedMs = channelFailedMs;
+        this.retryTimeoutSec = retryTimeoutSec;
+        this.retryDelayMs = retryDelayMs;
     }
 
     public String getName() {
@@ -46,5 +52,13 @@ public class IptvServerConfig {
 
     public long getChannelFailedMs() {
         return channelFailedMs;
+    }
+
+    public long getRetryTimeoutSec() {
+        return retryTimeoutSec;
+    }
+
+    public long getRetryDelayMs() {
+        return retryDelayMs;
     }
 }
