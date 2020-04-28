@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.kvaster.utils.digest.Digest;
@@ -46,6 +47,8 @@ public class IptvServerChannel {
 
     private volatile long failedUntil;
 
+    private final long defaultInfoTimeout;
+
     private static class Stream {
         String path;
         String url;
@@ -67,7 +70,33 @@ public class IptvServerChannel {
         }
     }
 
-    private volatile Map<String, Stream> streamMap = new HashMap<>();
+    private static class Streams {
+        List<Stream> streams = new ArrayList<>();
+        long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
+    }
+
+    private interface StreamsConsumer {
+        void onInfo(Streams streams, int statusCode);
+    }
+
+    private static class UserStreams {
+        Streams streams;
+        List<StreamsConsumer> consumers = new ArrayList<>();
+        Map<String, Stream> streamMap = new HashMap<>();
+        long infoTimeout;
+
+        UserStreams(long infoTimeout) {
+            this.infoTimeout = infoTimeout;
+        }
+
+        List<StreamsConsumer> getAndClearConsumers() {
+            var c = consumers;
+            consumers = new ArrayList<>();
+            return c;
+        }
+    }
+
+    private final Map<String, UserStreams> userStreams = new ConcurrentHashMap<>();
 
     private static final HttpString[] HEADERS = {
         Headers.CONTENT_TYPE,
@@ -98,6 +127,8 @@ public class IptvServerChannel {
         this.timeoutSec = timeoutSec;
 
         this.timer = timer;
+
+        defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(0, Math.max(timeoutSec, server.getRetryTimeoutSec())) + 1);
     }
 
     @Override
@@ -125,6 +156,8 @@ public class IptvServerChannel {
     public void release(String userId) {
         LOG.info("[{}] channel released: {} / {}", userId, channelName, server.getName());
         server.release();
+
+        userStreams.remove(userId);
     }
 
     private HttpRequest.Builder createRequest(String url, IptvUser user) {
@@ -140,21 +173,29 @@ public class IptvServerChannel {
         return builder;
     }
 
+    private long calculateTimeout(long duration) {
+        // usually we expect that player will try not to decrease buffer size
+        // so we may expect that player will try to buffer more segments with durationMillis delay
+        // kodi is downloading two buffers at same time
+        // use 10 seconds for segment duration if unknown (5 or 7 seconds are usual values)
+        return (duration == 0 ? TimeUnit.SECONDS.toMillis(10) : duration) * 2 + TimeUnit.SECONDS.toMillis(1);
+    }
+
     public boolean handle(HttpServerExchange exchange, String path, IptvUser user, String token) {
+        UserStreams us = userStreams.computeIfAbsent(user.getId(), (u) -> new UserStreams(defaultInfoTimeout));
+
         if ("channel.m3u8".equals(path)) {
-            handleInfo(exchange, user, token);
+            handleInfo(exchange, user, token, us);
             return true;
         } else {
-            Stream stream = streamMap.get(path);
+            // iptv user is synchronized (locked) at this place
+            Stream stream = us.streamMap.get(path);
 
             if (stream != null) {
                 final String rid = RequestCounter.next();
                 LOG.info("{}[{}] stream: {}", rid, user.getId(), stream);
 
-                // usually we expect that player will try not to decrease buffer size
-                // so we may expect that player will try to buffer more segments with durationMillis delay
-                // kodi is downloading two buffers at same time
-                long timeout = stream.durationMillis * 2 + TimeUnit.SECONDS.toMillis(1);
+                long timeout = calculateTimeout(stream.durationMillis);
                 user.setExpireTime(System.currentTimeMillis() + timeout);
 
                 if (!server.getProxyStream()) {
@@ -187,29 +228,9 @@ public class IptvServerChannel {
         return false;
     }
 
-    ////////////////////////////////////////////////////////////////
-
-    private static class Streams {
-        List<Stream> streams = new ArrayList<>();
-        long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
-    }
-
-    private interface StreamsConsumer {
-        void onInfo(Streams streams, int statusCode);
-    }
-
-    private List<StreamsConsumer> streamsConsumers = new ArrayList<>();
-    private Streams streams;
-
-    private synchronized List<StreamsConsumer> getAndClearStreamsConsumers() {
-        List<StreamsConsumer> cs = streamsConsumers;
-        streamsConsumers = new ArrayList<>();
-        return cs;
-    }
-
-    private void handleInfo(HttpServerExchange exchange, IptvUser user, String token) {
+    private void handleInfo(HttpServerExchange exchange, IptvUser user, String token, UserStreams us) {
         // we'll wait maximum one second for stream download start after loading info
-        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1));
+        user.setExpireTime(System.currentTimeMillis() + us.infoTimeout);
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             String rid = RequestCounter.next();
@@ -236,26 +257,25 @@ public class IptvServerChannel {
                     exchange.getResponseSender().send(sb.toString());
                     exchange.endExchange();
                 }
-            }, user);
+            }, user, us);
         });
     }
 
-    // TODO we must get rid of user info here
-    // what happens - we'll be loading stream info on behalf of specific user, but what we should really do
-    // is to keep per-channel connection. Probably we should have some way to mark channel as free
-    // without timeouts
-    private void loadCachedInfo(StreamsConsumer consumer, IptvUser user) {
+    private void loadCachedInfo(StreamsConsumer consumer, IptvUser user, UserStreams us) {
         Streams s = null;
         boolean startReq = false;
 
-        synchronized (this) {
-            if (streams != null && System.currentTimeMillis() < streams.expireTime) {
-                s = streams;
+        user.lock();
+        try {
+            if (us.streams != null && System.currentTimeMillis() < us.streams.expireTime) {
+                s = us.streams;
             } else {
-                streams = null;
-                startReq = streamsConsumers.size() == 0;
-                streamsConsumers.add(consumer);
+                us.streams = null;
+                startReq = us.consumers.size() == 0;
+                us.consumers.add(consumer);
             }
+        } finally {
+            user.unlock();
         }
 
         if (startReq) {
@@ -263,18 +283,18 @@ public class IptvServerChannel {
                     RequestCounter.next(),
                     0,
                     System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getRetryTimeoutSec()),
-                    user
+                    user,
+                    us
             );
         } else if (s != null) {
             consumer.onInfo(s, 0);
         }
     }
 
-    // TODO we must get rid of user info here
-    private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user) {
+    private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user, UserStreams us) {
         HttpRequest req = createRequest(channelUrl, user).build();
 
-        LOG.info("{}loading channel: {}, url: {}, retry: {}", rid, channelName, channelUrl, retryNo);
+        LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, channelUrl, retryNo);
 
         httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
                 .whenComplete((resp, err) -> {
@@ -328,49 +348,59 @@ public class IptvServerChannel {
 
                                 startTime = durationMillis == 0 ? 0 : startTime + durationMillis;
                                 // cache until end of life of current segment
-                                streams.expireTime = Math.max(streams.expireTime, startTime);
+                                // 500ms -> for time drift/difference
+                                streams.expireTime = Math.max(streams.expireTime, Math.max(0, startTime - 500));
                                 durationMillis = 0;
                             }
                         }
 
                         List<StreamsConsumer> cs;
 
-                        synchronized (this) {
-                            this.streamMap = streamMap;
-                            this.streams = streams;
+                        user.lock();
+                        try {
+                            us.streamMap = streamMap;
+                            us.streams = streams;
 
-                            cs = getAndClearStreamsConsumers();
+                            if (streams.streams.size() > 0) {
+                                us.infoTimeout = calculateTimeout(streams.streams.get(streams.streams.size() - 1).durationMillis);
+                            }
+
+                            user.setExpireTime(System.currentTimeMillis() + us.infoTimeout);
+
+                            cs = us.getAndClearConsumers();
+                        } finally {
+                            user.unlock();
                         }
 
                         cs.forEach(c -> c.onInfo(streams, -1));
 
-                        LOG.info("{}m3u start: {}, end: {}", rid, new Date(m3uStart), new Date(startTime));
+                        LOG.info("{}[{}] m3u start: {}, end: {}", rid, user.getId(), new Date(m3uStart), new Date(startTime));
                     } else {
                         if (System.currentTimeMillis() < expireTime) {
-                            LOG.info("{}will retry", rid);
+                            LOG.info("{}[{}] will retry", rid, user.getId());
 
                             timer.schedule(new TimerTask() {
                                 @Override
                                 public void run() {
-                                    loadInfo(rid, retryNo + 1, expireTime, user);
+                                    loadInfo(rid, retryNo + 1, expireTime, user, us);
                                 }
                             }, server.getRetryDelayMs());
                         } else {
                             if (server.getChannelFailedMs() > 0) {
                                 user.lock();
                                 try {
-                                    LOG.warn("{}channel failed", rid);
+                                    LOG.warn("{}[{}] channel failed", rid, user.getId());
                                     failedUntil = System.currentTimeMillis() + server.getChannelFailedMs();
                                     user.onRemove();
                                 } finally {
                                     user.unlock();
                                 }
                             } else {
-                                LOG.warn("{}streams failed", rid);
+                                LOG.warn("{}[{}] streams failed", rid, user.getId());
                             }
 
                             int statusCode = resp == null ? HttpURLConnection.HTTP_INTERNAL_ERROR : resp.statusCode();
-                            getAndClearStreamsConsumers().forEach(c -> c.onInfo(null, statusCode));
+                            us.getAndClearConsumers().forEach(c -> c.onInfo(null, statusCode));
                         }
                     }
                 });
