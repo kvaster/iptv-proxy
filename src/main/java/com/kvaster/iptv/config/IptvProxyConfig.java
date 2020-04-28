@@ -14,7 +14,7 @@ public class IptvProxyConfig {
     private List<IptvServerConfig> servers;
     private boolean allowAnonymous = true;
     private Set<String> users = new HashSet<>();
-    private int timeoutSec = 15;
+    private int timeoutSec = 5;
 
     protected IptvProxyConfig() {
         // for deserialization

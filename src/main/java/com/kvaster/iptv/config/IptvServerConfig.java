@@ -7,8 +7,8 @@ public class IptvServerConfig {
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
-    private long retryTimeoutSec;
-    private long retryDelayMs;
+    private long retryTimeoutSec = 3;
+    private long retryDelayMs = 500;
 
     protected IptvServerConfig() {
         // for deserialization

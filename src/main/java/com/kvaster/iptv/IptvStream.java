@@ -34,12 +34,27 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     private final SpeedMeter readMeter;
     private final SpeedMeter writeMeter;
 
-    public IptvStream(HttpServerExchange exchange, String rid) {
+    public IptvStream(HttpServerExchange exchange, String rid, IptvUser user, long timeout) {
         this.exchange = exchange;
         this.rid = rid;
 
         readMeter = new SpeedMeter(rid + "read: ");
-        writeMeter = new SpeedMeter(rid + "write: ");
+        writeMeter = new SpeedMeter(rid + "write: ") {
+            @Override
+            protected void onLog() {
+                user.lock();
+                try {
+                    user.setExpireTime(System.currentTimeMillis() + timeout);
+                } finally {
+                    user.unlock();
+                }
+            }
+
+            @Override
+            protected void onFinish() {
+                onLog();
+            }
+        };
     }
 
     @Override

@@ -42,16 +42,8 @@ public class IptvUser {
         return expireTime - System.currentTimeMillis();
     }
 
-    public boolean isExpired(long delay) {
-        return expireTime <= 0;
-    }
-
     public void setExpireTime(long expireTime) {
-        this.expireTime = expireTime;
-    }
-
-    public void addExpireTime(long durationMillis) {
-        expireTime += durationMillis;
+        this.expireTime = Math.max(this.expireTime, expireTime);
     }
 
     public void cancelTask() {

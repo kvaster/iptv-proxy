@@ -153,7 +153,9 @@ public class IptvServerChannel {
 
                 // usually we expect that player will try not to decrease buffer size
                 // so we may expect that player will try to buffer more segments with durationMillis delay
-                user.setExpireTime(System.currentTimeMillis() + stream.durationMillis * 2 + 1000);
+                // kodi is downloading two buffers at same time
+                long timeout = stream.durationMillis * 2 + TimeUnit.SECONDS.toMillis(1);
+                user.setExpireTime(System.currentTimeMillis() + timeout);
 
                 if (!server.getProxyStream()) {
                     LOG.info("{}redirecting stream to direct url", rid);
@@ -173,7 +175,7 @@ public class IptvServerChannel {
                                         resp.headers().firstValue(header.toString()).ifPresent(value -> exchange.getResponseHeaders().add(header, value));
                                     }
 
-                                    resp.body().subscribe(new IptvStream(exchange, rid));
+                                    resp.body().subscribe(new IptvStream(exchange, rid, user, timeout));
                                 }
                             });
                 });
@@ -206,7 +208,8 @@ public class IptvServerChannel {
     }
 
     private void handleInfo(HttpServerExchange exchange, IptvUser user, String token) {
-        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(timeoutSec + 1));
+        // we'll wait maximum one second for stream download start after loading info
+        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1));
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             String rid = RequestCounter.next();
