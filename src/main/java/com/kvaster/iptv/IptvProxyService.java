@@ -240,12 +240,9 @@ public class IptvProxyService implements HttpHandler {
             return false;
         }
 
-        IptvUser iu = users.computeIfAbsent(user, IptvUser::new);
+        IptvUser iu = users.computeIfAbsent(user, (u) -> new IptvUser(u, timer, users::remove));
         iu.lock();
         try {
-            // cancel any expiring tasks
-            iu.cancelTask();
-
             IptvServerChannel serverChannel = iu.getServerChannel(channel);
             if (serverChannel == null) {
                 return false;
@@ -253,23 +250,6 @@ public class IptvProxyService implements HttpHandler {
 
             return serverChannel.handle(exchange, path, iu, token);
         } finally {
-            // launch expiring task
-            TimerTask t = new TimerTask() {
-                @Override
-                public void run() {
-                    iu.lock();
-                    try {
-                        users.remove(iu.getId(), iu);
-                        iu.onRemove();
-                    } finally {
-                        iu.unlock();
-                    }
-                }
-            };
-
-            iu.setTask(t);
-            timer.schedule(t, iu.expireDelay() + 100); // add 100ms for timer
-
             iu.unlock();
         }
     }

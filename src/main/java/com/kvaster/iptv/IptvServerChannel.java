@@ -391,7 +391,7 @@ public class IptvServerChannel {
                                 try {
                                     LOG.warn("{}[{}] channel failed", rid, user.getId());
                                     failedUntil = System.currentTimeMillis() + server.getChannelFailedMs();
-                                    user.onRemove();
+                                    user.releaseChannel();
                                 } finally {
                                     user.unlock();
                                 }

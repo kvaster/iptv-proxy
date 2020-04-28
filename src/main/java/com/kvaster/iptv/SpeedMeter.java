@@ -16,7 +16,7 @@ public class SpeedMeter {
 
     private final String rid;
 
-    private long time;
+    private final long time;
     private long bytes;
 
     private long partTime;
@@ -52,8 +52,6 @@ public class SpeedMeter {
         }
 
         LOG.debug("{}finished: {}, speed: {}/s", rid, format(bytes), format(bytes * 1000 / (now - time)));
-
-        onFinish();
     }
 
     private void logPart() {
@@ -63,16 +61,6 @@ public class SpeedMeter {
         LOG.debug("{}progress: {} speed: {}/s", rid, format(partBytes), format(partBytes * 1000 / delta));
         partTime = now;
         partBytes = 0;
-
-        onLog();
-    }
-
-    protected void onLog() {
-        // do nothing
-    }
-
-    protected void onFinish() {
-        // do nothing
     }
 
     private String format(long value) {
