@@ -178,7 +178,7 @@ public class IptvServerChannel {
         // so we may expect that player will try to buffer more segments with durationMillis delay
         // kodi is downloading two buffers at same time
         // use 10 seconds for segment duration if unknown (5 or 7 seconds are usual values)
-        return (duration == 0 ? TimeUnit.SECONDS.toMillis(10) : duration) * 2 + TimeUnit.SECONDS.toMillis(1);
+        return (duration == 0 ? TimeUnit.SECONDS.toMillis(10) : duration) * 3 + TimeUnit.SECONDS.toMillis(1);
     }
 
     public boolean handle(HttpServerExchange exchange, String path, IptvUser user, String token) {
