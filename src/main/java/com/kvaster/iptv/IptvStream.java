@@ -21,13 +21,13 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     private final HttpServerExchange exchange;
 
-    private Queue<ByteBuffer> buffers = new LinkedBlockingQueue<>();
-    private AtomicBoolean busy = new AtomicBoolean();
+    private final Queue<ByteBuffer> buffers = new LinkedBlockingQueue<>();
+    private final AtomicBoolean busy = new AtomicBoolean();
 
     private volatile Subscription subscription;
 
-    private static ByteBuffer END_MARKER = ByteBuffer.allocate(0);
-    private static List<ByteBuffer> END_ARRAY_MARKER = Collections.singletonList(END_MARKER);
+    private final static ByteBuffer END_MARKER = ByteBuffer.allocate(0);
+    private final static List<ByteBuffer> END_ARRAY_MARKER = Collections.singletonList(END_MARKER);
 
     private final String rid;
 
