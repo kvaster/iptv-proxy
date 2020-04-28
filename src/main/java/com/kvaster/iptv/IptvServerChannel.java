@@ -33,6 +33,7 @@ public class IptvServerChannel {
 
     private static final String TAG_EXTINF = "#EXTINF:";
     private static final String TAG_PROGRAM_DATE_TIME = "#EXT-X-PROGRAM-DATE-TIME:";
+    private static final String TAG_TARGET_DURATION = "#EXT-X-TARGETDURATION:";
 
     private final IptvServer server;
     private final String channelUrl;
@@ -66,13 +67,14 @@ public class IptvServerChannel {
 
         @Override
         public String toString() {
-            return "[path: " + path + ", url: " + url + ", start: " + new Date(startTime) + ", duration: " + (durationMillis / 1000) + "s]";
+            return "[path: " + path + ", url: " + url + ", start: " + new Date(startTime) + ", duration: " + (durationMillis / 1000f) + "s]";
         }
     }
 
     private static class Streams {
         List<Stream> streams = new ArrayList<>();
         long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
+        long maxDuration = 0;
     }
 
     private interface StreamsConsumer {
@@ -176,7 +178,7 @@ public class IptvServerChannel {
     private long calculateTimeout(long duration) {
         // usually we expect that player will try not to decrease buffer size
         // so we may expect that player will try to buffer more segments with durationMillis delay
-        // kodi is downloading two buffers at same time
+        // kodi is downloading two or three buffers at same time
         // use 10 seconds for segment duration if unknown (5 or 7 seconds are usual values)
         return (duration == 0 ? TimeUnit.SECONDS.toMillis(10) : duration) * 3 + TimeUnit.SECONDS.toMillis(1);
     }
@@ -195,7 +197,7 @@ public class IptvServerChannel {
                 final String rid = RequestCounter.next();
                 LOG.info("{}[{}] stream: {}", rid, user.getId(), stream);
 
-                long timeout = calculateTimeout(stream.durationMillis);
+                long timeout = calculateTimeout(us.streams.maxDuration);
                 user.setExpireTime(System.currentTimeMillis() + timeout);
 
                 if (!server.getProxyStream()) {
@@ -325,6 +327,7 @@ public class IptvServerChannel {
 
                                     try {
                                         durationMillis = new BigDecimal(v).multiply(new BigDecimal(1000)).longValue();
+                                        streams.maxDuration = Math.max(streams.maxDuration, durationMillis);
                                     } catch (NumberFormatException e) {
                                         // do nothing
                                     }
@@ -333,6 +336,13 @@ public class IptvServerChannel {
                                         ZonedDateTime dateTime = ZonedDateTime.parse(l.substring(TAG_PROGRAM_DATE_TIME.length()), DateTimeFormatter.ISO_DATE_TIME);
                                         m3uStart = startTime = dateTime.toInstant().toEpochMilli();
                                     } catch (Exception e) {
+                                        // do nothing
+                                    }
+                                } else if (l.startsWith(TAG_TARGET_DURATION)) {
+                                    try {
+                                        long targetDuration = new BigDecimal(l.substring(TAG_TARGET_DURATION.length())).multiply(new BigDecimal(1000)).longValue();
+                                        streams.maxDuration = Math.max(streams.maxDuration, targetDuration);
+                                    } catch (NumberFormatException e) {
                                         // do nothing
                                     }
                                 }
@@ -361,9 +371,7 @@ public class IptvServerChannel {
                             us.streamMap = streamMap;
                             us.streams = streams;
 
-                            if (streams.streams.size() > 0) {
-                                us.infoTimeout = calculateTimeout(streams.streams.get(streams.streams.size() - 1).durationMillis);
-                            }
+                            us.infoTimeout = calculateTimeout(streams.maxDuration);
 
                             user.setExpireTime(System.currentTimeMillis() + us.infoTimeout);
 
@@ -372,9 +380,9 @@ public class IptvServerChannel {
                             user.unlock();
                         }
 
-                        cs.forEach(c -> c.onInfo(streams, -1));
+                        LOG.info("{}[{}] m3u start: {}, end: {}, maxDuration: {}s", rid, user.getId(), new Date(m3uStart), new Date(startTime), streams.maxDuration / 1000f);
 
-                        LOG.info("{}[{}] m3u start: {}, end: {}", rid, user.getId(), new Date(m3uStart), new Date(startTime));
+                        cs.forEach(c -> c.onInfo(streams, -1));
                     } else {
                         if (System.currentTimeMillis() < expireTime) {
                             LOG.info("{}[{}] will retry", rid, user.getId());
