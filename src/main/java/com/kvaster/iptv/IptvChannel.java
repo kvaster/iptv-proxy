@@ -17,7 +17,7 @@ public class IptvChannel {
 
     private final Random rand = new Random();
 
-    private List<IptvServerChannel> serverChannels = new ArrayList<>();
+    private final List<IptvServerChannel> serverChannels = new ArrayList<>();
 
     public IptvChannel(String id, String name, String[] info) {
         this.id = id;
