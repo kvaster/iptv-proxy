@@ -73,6 +73,7 @@ public class IptvServerChannel {
 
     private static class Streams {
         List<Stream> streams = new ArrayList<>();
+        // cache only for 1s to avoid burst requests
         long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
         long maxDuration = 0;
     }
@@ -357,9 +358,6 @@ public class IptvServerChannel {
                                 sb = new StringBuilder();
 
                                 startTime = durationMillis == 0 ? 0 : startTime + durationMillis;
-                                // cache until end of life of current segment
-                                // 500ms -> for time drift/difference
-                                streams.expireTime = Math.max(streams.expireTime, Math.max(0, startTime - 500));
                                 durationMillis = 0;
                             }
                         }
