@@ -15,7 +15,7 @@ plugins {
 }
 
 tasks.wrapper {
-    gradleVersion = "6.0.1"
+    gradleVersion = "6.4"
     distributionType = Wrapper.DistributionType.ALL
 }
 
@@ -40,8 +40,8 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_13
+    targetCompatibility = JavaVersion.VERSION_13
 }
 
 application {
