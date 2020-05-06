@@ -213,7 +213,7 @@ public class IptvServerChannel {
                     HttpRequest req = createRequest(stream.url, user).build();
 
                     // configure buffering according to undertow buffers settings for best performance
-                    httpClient.sendAsync(req, HttpResponse.BodyHandlers.buffering(HttpResponse.BodyHandlers.ofPublisher(), 1024 * 16 - 20))
+                    httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
                             .whenComplete((resp, err) -> {
                                 if (HttpUtils.isOk(resp, err, exchange, rid)) {
                                     for (HttpString header : HEADERS) {
