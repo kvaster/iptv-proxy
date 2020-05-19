@@ -50,7 +50,7 @@ public class IptvProxyService implements HttpHandler {
     private final boolean allowAnonymous;
     private final Set<String> allowedUsers;
 
-    private final int timeoutSec;
+    private final int connectTimeoutSec;
 
     public IptvProxyService(IptvProxyConfig config) throws Exception {
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
@@ -60,7 +60,7 @@ public class IptvProxyService implements HttpHandler {
         this.allowAnonymous = config.getAllowAnonymous();
         this.allowedUsers = config.getUsers();
 
-        this.timeoutSec = config.getTimeoutSec();
+        this.connectTimeoutSec = config.getConnectTimeoutSec();
 
         undertow = Undertow.builder()
                 .addHttpListener(config.getPort(), config.getHost())
@@ -146,7 +146,7 @@ public class IptvProxyService implements HttpHandler {
 
                         IptvServerChannel serverChannel = serverChannelsByUrl.get(line);
                         if (serverChannel == null) {
-                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, timeoutSec, timer);
+                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, connectTimeoutSec, timer);
                         }
 
                         channel.addServerChannel(serverChannel);
@@ -171,9 +171,10 @@ public class IptvProxyService implements HttpHandler {
 
     private String loadChannels(String url, HttpClient httpClient) {
         try {
+            // TODO we should implement better channels loading retry logic
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(timeoutSec))
+                    .timeout(Duration.ofSeconds(connectTimeoutSec))
                     .build();
 
             HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());

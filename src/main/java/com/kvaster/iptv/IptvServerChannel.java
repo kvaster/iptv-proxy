@@ -42,7 +42,7 @@ public class IptvServerChannel {
     private final String channelName;
 
     private final HttpClient httpClient;
-    private final int timeoutSec;
+    private final int connectTimeoutSec;
 
     private final Timer timer;
 
@@ -117,7 +117,7 @@ public class IptvServerChannel {
 
     public IptvServerChannel(
             IptvServer server, String channelUrl, BaseUrl baseUrl,
-            String channelId, String channelName, int timeoutSec,
+            String channelId, String channelName, int connectTimeoutSec,
             Timer timer
     ) {
         this.server = server;
@@ -127,11 +127,11 @@ public class IptvServerChannel {
         this.channelName = channelName;
 
         this.httpClient = server.getHttpClient();
-        this.timeoutSec = timeoutSec;
+        this.connectTimeoutSec = connectTimeoutSec;
 
         this.timer = timer;
 
-        defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(0, Math.max(timeoutSec, server.getRetryTimeoutSec())) + 1);
+        defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(0, Math.max(connectTimeoutSec, server.getInfoTimeoutSec())) + 1);
     }
 
     @Override
@@ -166,7 +166,7 @@ public class IptvServerChannel {
     private HttpRequest.Builder createRequest(String url, IptvUser user) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(timeoutSec));
+                .timeout(Duration.ofSeconds(connectTimeoutSec));
 
         // send user id to next iptv-proxy
         if (server.getSendUser()) {
@@ -286,7 +286,7 @@ public class IptvServerChannel {
             loadInfo(
                     RequestCounter.next(),
                     0,
-                    System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getRetryTimeoutSec()),
+                    System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getInfoTimeoutSec()),
                     user,
                     us
             );
@@ -391,7 +391,7 @@ public class IptvServerChannel {
                                 public void run() {
                                     loadInfo(rid, retryNo + 1, expireTime, user, us);
                                 }
-                            }, server.getRetryDelayMs());
+                            }, server.getInfoRetryDelayMs());
                         } else {
                             if (server.getChannelFailedMs() > 0) {
                                 user.lock();

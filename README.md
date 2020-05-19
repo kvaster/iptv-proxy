@@ -16,7 +16,7 @@ port: 8080
 base_url: http://127.0.0.1:8080
 forwarded_pass: password
 token_salt: 6r8bt67ta5e87tg7afn
-timeout_sec: 5
+connect_timeout_sec: 2
 servers:
   - name: someiptv-1
     url: https://someiptv.com/playlist.m3u
@@ -27,8 +27,8 @@ servers:
     send_user: true
     proxy_stream: true
     channel_failed_ms: 1000
-    retry_timeout_sec: 3
-    retry_delay_ms: 500
+    info_timeout_sec: 3
+    info_retry_delay_ms: 500
 allow_anonymous: false
 users:
   - 65182_login1
@@ -38,7 +38,8 @@ users:
 * `base_url` - url of your service, you may omit this (see forwarded_pass)
 * `forwarded_pass` - password for Forwarded header in case iptvproxy is behind proxy
 * `token_salt` - just random chars, they are used to create encrypted tokens
-* `timeout_sec` - http connect timeout, default value is 5 seconds and this is more than enough
+* `connect_timeout_sec` - http connect timeout, default value is 2 seconds and this is more than enough,
+used for both info and stream connections
 * `max_connections` - max active connections allowed for this playlist
 * `send_user` - this is useful only when you're using cascade config - iptv-proxy behind iptv-proxy.
 If 'true' then iptv-proxy will send current user name in special http header.
@@ -50,10 +51,10 @@ false means using direct urls for data
 it will be marked as 'failed' for some time and will be not used for any subsequent requests.
 This feature should be enabled for last iptvproxy in chain (the one which connects to your iptv service)
 and should be disabled in other situation
-* `retry_timeout_sec` - some providers may return 404 http error on m3u8 request. This setting
+* `info_timeout_sec` - some providers may return 404 http error on m3u8 request. This setting
 will trigger automatic request retry. We'll be trying to make additional requests for this period.
-Default value is 3 seconds
-* `retry_delay_ms` - delay in milliseconds between retries. Default value is 500ms  
+Default value is 3 seconds. 6 seconds is recommended for cascade proxy. 
+* `info_retry_delay_ms` - delay in milliseconds between retries. Default value is 500ms  
 * `allow_anonymous` - allow to connect any device without specific user name.
 It is not good idea to use such setup. You really should add name for each device you're using.
 

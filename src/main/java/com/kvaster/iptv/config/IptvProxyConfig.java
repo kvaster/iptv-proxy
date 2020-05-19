@@ -14,7 +14,7 @@ public class IptvProxyConfig {
     private List<IptvServerConfig> servers;
     private boolean allowAnonymous = true;
     private Set<String> users = new HashSet<>();
-    private int timeoutSec = 5;
+    private int connectTimeoutSec = 2;
 
     protected IptvProxyConfig() {
         // for deserialization
@@ -23,7 +23,7 @@ public class IptvProxyConfig {
     public IptvProxyConfig(
             String host, int port, String baseUrl, String forwardedPass,
             String tokenSalt, List<IptvServerConfig> servers,
-            boolean allowAnonymous, Set<String> users, int timeoutSec
+            boolean allowAnonymous, Set<String> users, int connectTimeoutSec
     ) {
         this.host = host;
         this.port = port;
@@ -33,7 +33,7 @@ public class IptvProxyConfig {
         this.servers = new ArrayList<>(servers);
         this.allowAnonymous = allowAnonymous;
         this.users = new HashSet<>(users);
-        this.timeoutSec = timeoutSec;
+        this.connectTimeoutSec = connectTimeoutSec;
     }
 
     public String getHost() {
@@ -68,7 +68,7 @@ public class IptvProxyConfig {
         return users;
     }
 
-    public int getTimeoutSec() {
-        return timeoutSec;
+    public int getConnectTimeoutSec() {
+        return connectTimeoutSec;
     }
 }

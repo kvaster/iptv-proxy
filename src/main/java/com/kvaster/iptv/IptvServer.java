@@ -13,8 +13,8 @@ public class IptvServer {
     private final boolean sendUser;
     private final boolean proxyStream;
     private final long channelFailedMs;
-    private final long retryTimeoutSec;
-    private final long retryDelayMs;
+    private final long infoTimeoutSec;
+    private final long infoRetryDelayMs;
 
     private final HttpClient httpClient;
 
@@ -24,22 +24,23 @@ public class IptvServer {
         this(
                 sc.getName(), sc.getUrl(), sc.getMaxConnections(),
                 sc.getSendUser(), sc.getProxyStream(), sc.getChannelFailedMs(),
-                sc.getRetryTimeoutSec(), sc.getRetryDelayMs()
+                sc.getInfoTimeoutSec(), sc.getInfoRetryDelayMs()
         );
     }
 
     public IptvServer(String name, String url, int maxConnections,
             boolean sendUser, boolean proxyStream,
             long channelFailedMs,
-            long retryTimeoutSec, long retryDelayMs) {
+            long infoTimeoutSec, long infoRetryDelayMs
+    ) {
         this.name = name;
         this.url = url;
         this.maxConnections = maxConnections;
         this.sendUser = sendUser;
         this.proxyStream = proxyStream;
         this.channelFailedMs = channelFailedMs;
-        this.retryTimeoutSec = retryTimeoutSec;
-        this.retryDelayMs = retryDelayMs;
+        this.infoTimeoutSec = infoTimeoutSec;
+        this.infoRetryDelayMs = infoRetryDelayMs;
 
         httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.ALWAYS)
@@ -70,12 +71,12 @@ public class IptvServer {
         return channelFailedMs;
     }
 
-    public long getRetryTimeoutSec() {
-        return retryTimeoutSec;
+    public long getInfoTimeoutSec() {
+        return infoTimeoutSec;
     }
 
-    public long getRetryDelayMs() {
-        return retryDelayMs;
+    public long getInfoRetryDelayMs() {
+        return infoRetryDelayMs;
     }
 
     public synchronized boolean acquire() {
