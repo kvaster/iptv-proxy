@@ -1,6 +1,5 @@
 package com.kvaster.iptv;
 
-import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -17,7 +16,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -52,7 +53,7 @@ public class IptvProxyService implements HttpHandler {
 
     private final int connectTimeoutSec;
 
-    public IptvProxyService(IptvProxyConfig config) throws Exception {
+    public IptvProxyService(IptvProxyConfig config) {
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
 
         this.tokenSalt = config.getTokenSalt();
@@ -72,7 +73,7 @@ public class IptvProxyService implements HttpHandler {
         servers = Collections.unmodifiableList(ss);
     }
 
-    public void startService() throws IOException {
+    public void startService() {
         LOG.info("starting");
 
         undertow.start();
@@ -114,13 +115,23 @@ public class IptvProxyService implements HttpHandler {
 
         Digest digest = Digest.sha256();
 
-        for (IptvServer server : servers) {
-            LOG.info("loading playlist: {}", server.getName());
+        Map<IptvServer, CompletableFuture<String>> loads = new HashMap<>();
+        servers.forEach((s) -> loads.put(s, loadChannelsAsync(s.getName(), s.getUrl(), s.getHttpClient())));
 
-            String channels = loadChannels(server.getUrl(), server.getHttpClient());
+        for (IptvServer server : servers) {
+            String channels = null;
+
+            try {
+                channels = loads.get(server).get();
+            } catch (InterruptedException | ExecutionException e) {
+                LOG.error("error waiting for channels load", e);
+            }
+
             if (channels == null) {
                 return false;
             }
+
+            LOG.info("parsing playlist: {}", server.getName());
 
             String name = null;
             List<String> info = new ArrayList<>(10); // magic number, usually we have only 1-3 lines of info tags
@@ -138,7 +149,7 @@ public class IptvProxyService implements HttpHandler {
                     }
                 } else {
                     if (name == null) {
-                        LOG.warn("skipping malformed channel: {}", line);
+                        LOG.warn("skipping malformed channel: {}, server: {}", line, server.getName());
                     } else {
                         String id = digest.digest(name);
                         final String _name = name;
@@ -169,28 +180,26 @@ public class IptvProxyService implements HttpHandler {
         return true;
     }
 
-    private String loadChannels(String url, HttpClient httpClient) {
-        try {
-            // TODO we should implement better channels loading retry logic
-            HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(connectTimeoutSec))
-                    .build();
+    private CompletableFuture<String> loadChannelsAsync(String name, String url, HttpClient httpClient) {
+        // TODO we should implement better channels loading retry logic
+        LOG.info("loading playlist: {}", name);
 
-            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(connectTimeoutSec))
+                .build();
 
-            if (resp.statusCode() != HttpURLConnection.HTTP_OK) {
-                LOG.error("can't load playlist - status code is: {}", resp.statusCode());
-            } else {
+        return httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+            .handleAsync((resp, err) -> {
+                if (resp == null) {
+                    LOG.error("can't load playlist - io error: {}, server: {}", err == null ? null : err.getMessage(), name);
+                    return null;
+                } else if (resp.statusCode() != HttpURLConnection.HTTP_OK) {
+                    LOG.error("can't load playlist - status code is: {}, server: {}", resp.statusCode(), name);
+                }
+
                 return resp.body();
-            }
-        } catch (IOException ie) {
-            LOG.error("can't load playlist - io error: {}", ie.getMessage());
-        } catch (InterruptedException ie) {
-            LOG.error("interrupted while loading playlist");
-        }
-
-        return null;
+            });
     }
 
     @Override
