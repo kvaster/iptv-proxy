@@ -34,6 +34,10 @@ import org.slf4j.LoggerFactory;
 public class IptvProxyService implements HttpHandler {
     private static final Logger LOG = LoggerFactory.getLogger(IptvProxyService.class);
 
+    private static final long CHANNELS_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(60);
+    private static final long CHANNELS_CONNECT_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
+    private static final long CHANNELS_RETRY_DELAY_MS = 1000;
+
     private final Undertow undertow;
     private final Timer timer = new Timer();
 
@@ -76,8 +80,9 @@ public class IptvProxyService implements HttpHandler {
     public void startService() {
         LOG.info("starting");
 
+        updateChannels();
+
         undertow.start();
-        scheduleChannelsUpdate(1);
 
         LOG.info("started");
     }
@@ -95,16 +100,17 @@ public class IptvProxyService implements HttpHandler {
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                updateChannels();
+                new Thread(() -> updateChannels()).start();
             }
         }, delay);
     }
 
     private void updateChannels() {
-        if (updateChannelsImpl())
+        if (updateChannelsImpl()) {
             scheduleChannelsUpdate(TimeUnit.MINUTES.toMillis(240));
-        else
-            scheduleChannelsUpdate(TimeUnit.MINUTES.toMillis(10));
+        } else {
+            scheduleChannelsUpdate(TimeUnit.MINUTES.toMillis(1));
+        }
     }
 
     private boolean updateChannelsImpl() {
@@ -136,9 +142,10 @@ public class IptvProxyService implements HttpHandler {
             String name = null;
             List<String> info = new ArrayList<>(10); // magic number, usually we have only 1-3 lines of info tags
 
-            for (String line: channels.split("\n")) {
+            for (String line : channels.split("\n")) {
                 line = line.trim();
 
+                //noinspection StatementWithEmptyBody
                 if (line.startsWith("#EXTM3U")) {
                     // do nothing - m3u format tag
                 } else if (line.startsWith("#")) {
@@ -181,25 +188,44 @@ public class IptvProxyService implements HttpHandler {
     }
 
     private CompletableFuture<String> loadChannelsAsync(String name, String url, HttpClient httpClient) {
-        // TODO we should implement better channels loading retry logic
-        LOG.info("loading playlist: {}", name);
+        final String rid = RequestCounter.next();
+
+        var future = new CompletableFuture<String>();
+        loadChannelsAsync(name, url, httpClient, 0, System.currentTimeMillis() + CHANNELS_TIMEOUT_MS, rid, future);
+        return future;
+    }
+
+    private void loadChannelsAsync(
+            String name, String url, HttpClient httpClient, int retryNo,
+            long expireTime, String rid, CompletableFuture<String> future
+    ) {
+        LOG.info("{}loading playlist: {}, retry: {}", rid, name, retryNo);
 
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(connectTimeoutSec))
+                .timeout(Duration.ofMillis(CHANNELS_CONNECT_TIMEOUT_MS))
                 .build();
 
-        return httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-            .handleAsync((resp, err) -> {
-                if (resp == null) {
-                    LOG.error("can't load playlist - io error: {}, server: {}", err == null ? null : err.getMessage(), name);
-                    return null;
-                } else if (resp.statusCode() != HttpURLConnection.HTTP_OK) {
-                    LOG.error("can't load playlist - status code is: {}, server: {}", resp.statusCode(), name);
-                }
+        httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .whenComplete((resp, err) -> {
+                    if (HttpUtils.isOk(resp, err, rid)) {
+                        future.complete(resp.body());
+                    } else {
+                        if (System.currentTimeMillis() < expireTime) {
+                            LOG.warn("{}will retry", rid);
 
-                return resp.body();
-            });
+                            timer.schedule(new TimerTask() {
+                                @Override
+                                public void run() {
+                                    loadChannelsAsync(name, url, httpClient, retryNo + 1, expireTime, rid, future);
+                                }
+                            }, CHANNELS_RETRY_DELAY_MS);
+                        } else {
+                            LOG.error("{}failed", rid);
+                            future.complete(null);
+                        }
+                    }
+                });
     }
 
     @Override
@@ -288,7 +314,7 @@ public class IptvProxyService implements HttpHandler {
         return String.valueOf(idCounter.incrementAndGet());
     }
 
-    private String  generateToken(String user) {
+    private String generateToken(String user) {
         return user + '-' + Digest.md5(user + tokenSalt);
     }
 
