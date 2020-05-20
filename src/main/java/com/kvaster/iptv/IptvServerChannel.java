@@ -194,7 +194,10 @@ public class IptvServerChannel {
             // iptv user is synchronized (locked) at this place
             Stream stream = us.streamMap.get(path);
 
-            if (stream != null) {
+            if (stream == null) {
+                LOG.warn("[{}] stream not found: {}", user.getId(), exchange.getRequestPath());
+                return false;
+            } else {
                 final String rid = RequestCounter.next();
                 LOG.info("{}[{}] stream: {}", rid, user.getId(), stream);
 
@@ -228,8 +231,6 @@ public class IptvServerChannel {
                 return true;
             }
         }
-
-        return false;
     }
 
     private void handleInfo(HttpServerExchange exchange, IptvUser user, String token, UserStreams us) {

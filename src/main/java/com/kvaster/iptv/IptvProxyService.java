@@ -250,6 +250,7 @@ public class IptvProxyService implements HttpHandler {
         // channels
         int idx = path.indexOf('/');
         if (idx < 0) {
+            LOG.warn("wrong request: {}", exchange.getRequestPath());
             return false;
         }
 
@@ -258,6 +259,7 @@ public class IptvProxyService implements HttpHandler {
 
         IptvChannel channel = channels.get(ch);
         if (channel == null) {
+            LOG.warn("channel not found: {}, for request: {}", ch, exchange.getRequestPath());
             return false;
         }
 
@@ -273,6 +275,7 @@ public class IptvProxyService implements HttpHandler {
 
         // no token, or user is not verified
         if (user == null) {
+            LOG.warn("invalid user token: {}, proxyUser: {}", token, proxyUser);
             return false;
         }
 
@@ -334,6 +337,7 @@ public class IptvProxyService implements HttpHandler {
         }
 
         if (user == null) {
+            LOG.warn("user not defined for request: {}", exchange.getRequestPath());
             return false;
         }
 
