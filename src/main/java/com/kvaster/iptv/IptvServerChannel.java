@@ -55,6 +55,8 @@ public class IptvServerChannel {
 
     private final long defaultInfoTimeout;
 
+    private final boolean isHls;
+
     private static class Stream {
         String path;
         String url;
@@ -139,6 +141,13 @@ public class IptvServerChannel {
         this.timer = timer;
 
         defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(0, Math.max(connectTimeoutSec, server.getInfoTimeoutSec())) + 1);
+
+        try {
+            URI uri = new URI(channelUrl);
+            isHls = uri.getPath().endsWith(".m3u8") || uri.getPath().endsWith(".m3u");
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -193,7 +202,7 @@ public class IptvServerChannel {
 
     public boolean handle(HttpServerExchange exchange, String path, IptvUser user, String token) {
         if ("channel.m3u8".equals(path)) {
-            if (!channelUrl.endsWith(".m3u8")) {
+            if (!isHls) {
                 String url = exchange.getRequestURL().replace("channel.m3u8", "");
                 String q = exchange.getQueryString();
                 if (q != null && !q.isBlank()) {
@@ -250,6 +259,9 @@ public class IptvServerChannel {
             exchange.endExchange();
             return;
         }
+
+        // be sure we have time to start stream
+        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(connectTimeoutSec));
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             HttpRequest req = createRequest(url, user).build();
