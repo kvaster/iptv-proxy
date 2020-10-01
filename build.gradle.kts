@@ -15,7 +15,7 @@ plugins {
 }
 
 tasks.wrapper {
-    gradleVersion = "6.4"
+    gradleVersion = "6.7-rc-1"
     distributionType = Wrapper.DistributionType.ALL
 }
 

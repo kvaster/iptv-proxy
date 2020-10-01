@@ -21,6 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.kvaster.iptv.config.IptvProxyConfig;
 import com.kvaster.utils.digest.Digest;
@@ -37,6 +39,8 @@ public class IptvProxyService implements HttpHandler {
     private static final long CHANNELS_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(60);
     private static final long CHANNELS_CONNECT_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
     private static final long CHANNELS_RETRY_DELAY_MS = 1000;
+
+    private static final Pattern PAT_TVGID = Pattern.compile(".*tvg-id=\"(?<tvgid>[^\"]+)\".*");
 
     private final Undertow undertow;
     private final Timer timer = new Timer();
@@ -140,6 +144,7 @@ public class IptvProxyService implements HttpHandler {
             LOG.info("parsing playlist: {}", server.getName());
 
             String name = null;
+            String chanId = null;
             List<String> info = new ArrayList<>(10); // magic number, usually we have only 1-3 lines of info tags
 
             for (String line : channels.split("\n")) {
@@ -150,15 +155,25 @@ public class IptvProxyService implements HttpHandler {
                     // do nothing - m3u format tag
                 } else if (line.startsWith("#")) {
                     info.add(line);
-                    int idx = line.lastIndexOf(',');
-                    if (idx >= 0) {
-                        name = line.substring(idx + 1);
+
+                    if (line.startsWith("#EXTINF")) {
+                        int idx = line.lastIndexOf(',');
+                        if (idx >= 0) {
+                            name = line.substring(idx + 1);
+                        }
+
+                        Matcher m = PAT_TVGID.matcher(line);
+                        if (m.matches()) {
+                            chanId = m.group("tvgid");
+                        }
                     }
                 } else {
                     if (name == null) {
                         LOG.warn("skipping malformed channel: {}, server: {}", line, server.getName());
                     } else {
-                        String id = digest.digest(name);
+                        // TODO we need proper ID generation in order to be able to merge channels
+                        String id = digest.digest(chanId == null ? name : chanId);
+                        //String id = digest.digest(line);
                         final String _name = name;
                         IptvChannel channel = chs.computeIfAbsent(id, k -> new IptvChannel(id, _name, info.toArray(new String[0])));
 
@@ -269,14 +284,15 @@ public class IptvProxyService implements HttpHandler {
 
         // pass user name from another iptv-proxy
         String proxyUser = exchange.getRequestHeaders().getFirst(IptvServer.PROXY_USER_HEADER);
-        if (proxyUser != null) {
-            user = user + ':' + proxyUser;
-        }
 
         // no token, or user is not verified
         if (user == null) {
             LOG.warn("invalid user token: {}, proxyUser: {}", token, proxyUser);
             return false;
+        }
+
+        if (proxyUser != null) {
+            user = user + ':' + proxyUser;
         }
 
         IptvUser iu = users.computeIfAbsent(user, (u) -> new IptvUser(u, timer, users::remove));

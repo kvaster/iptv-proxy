@@ -3,9 +3,13 @@ package com.kvaster.iptv;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -16,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -87,9 +92,11 @@ public class IptvServerChannel {
         List<StreamsConsumer> consumers = new ArrayList<>();
         Map<String, Stream> streamMap = new HashMap<>();
         long infoTimeout;
+        String channelUrl;
 
-        UserStreams(long infoTimeout) {
+        UserStreams(long infoTimeout, String channelUrl) {
             this.infoTimeout = infoTimeout;
+            this.channelUrl = channelUrl;
         }
 
         List<StreamsConsumer> getAndClearConsumers() {
@@ -185,13 +192,37 @@ public class IptvServerChannel {
     }
 
     public boolean handle(HttpServerExchange exchange, String path, IptvUser user, String token) {
-        UserStreams us = userStreams.computeIfAbsent(user.getId(), (u) -> new UserStreams(defaultInfoTimeout));
-
         if ("channel.m3u8".equals(path)) {
-            handleInfo(exchange, user, token, us);
+            if (!channelUrl.endsWith(".m3u8")) {
+                String url = exchange.getRequestURL().replace("channel.m3u8", "");
+                String q = exchange.getQueryString();
+                if (q != null && !q.isBlank()) {
+                    url += '?' + q;
+                }
+
+                exchange.setStatusCode(StatusCodes.FOUND);
+                exchange.getResponseHeaders().add(Headers.LOCATION, url);
+                exchange.endExchange();
+                return true;
+            }
+
+            handleInfo(exchange, user, token);
+            return true;
+        } else if ("".equals(path)) {
+            final String rid = RequestCounter.next();
+            LOG.info("{}[{}] stream: {}", rid, user.getId(), channelUrl);
+
+            runStream(rid, exchange, user, channelUrl, TimeUnit.SECONDS.toMillis(1));
+
             return true;
         } else {
             // iptv user is synchronized (locked) at this place
+            UserStreams us = userStreams.get(user.getId());
+            if (us == null) {
+                LOG.warn("[{}] no streams set up: {}", user.getId(), exchange.getRequestPath());
+                return false;
+            }
+
             Stream stream = us.streamMap.get(path);
 
             if (stream == null) {
@@ -204,42 +235,48 @@ public class IptvServerChannel {
                 long timeout = calculateTimeout(us.streams.maxDuration);
                 user.setExpireTime(System.currentTimeMillis() + timeout);
 
-                if (!server.getProxyStream()) {
-                    LOG.info("{}redirecting stream to direct url", rid);
-                    exchange.setStatusCode(StatusCodes.FOUND);
-                    exchange.getResponseHeaders().add(Headers.LOCATION, stream.url);
-                    exchange.endExchange();
-                    return true;
-                }
-
-                exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-                    HttpRequest req = createRequest(stream.url, user).build();
-
-                    // configure buffering according to undertow buffers settings for best performance
-                    httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
-                            .whenComplete((resp, err) -> {
-                                if (HttpUtils.isOk(resp, err, exchange, rid)) {
-                                    for (HttpString header : HEADERS) {
-                                        resp.headers().firstValue(header.toString()).ifPresent(value -> exchange.getResponseHeaders().add(header, value));
-                                    }
-
-                                    resp.body().subscribe(new IptvStream(exchange, rid, user, timeout));
-                                }
-                            });
-                });
+                runStream(rid, exchange, user, stream.url, timeout);
 
                 return true;
             }
         }
     }
 
-    private void handleInfo(HttpServerExchange exchange, IptvUser user, String token, UserStreams us) {
+    private void runStream(String rid, HttpServerExchange exchange, IptvUser user, String url, long timeout) {
+        if (!server.getProxyStream()) {
+            LOG.info("{}redirecting stream to direct url", rid);
+            exchange.setStatusCode(StatusCodes.FOUND);
+            exchange.getResponseHeaders().add(Headers.LOCATION, url);
+            exchange.endExchange();
+            return;
+        }
+
+        exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
+            HttpRequest req = createRequest(url, user).build();
+
+            // configure buffering according to undertow buffers settings for best performance
+            httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
+                    .whenComplete((resp, err) -> {
+                        if (HttpUtils.isOk(resp, err, exchange, rid)) {
+                            for (HttpString header : HEADERS) {
+                                resp.headers().firstValue(header.toString()).ifPresent(value -> exchange.getResponseHeaders().add(header, value));
+                            }
+
+                            resp.body().subscribe(new IptvStream(exchange, rid, user, timeout));
+                        }
+                    });
+        });
+    }
+
+    private void handleInfo(HttpServerExchange exchange, IptvUser user, String token) {
+        UserStreams us = createUserStreams(exchange, user);
+
         // we'll wait maximum one second for stream download start after loading info
         user.setExpireTime(System.currentTimeMillis() + us.infoTimeout);
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             String rid = RequestCounter.next();
-            LOG.info("{}[{}] channel: {}, url: {}", rid, user.getId(), channelName, channelUrl);
+            LOG.info("{}[{}] channel: {}, url: {}", rid, user.getId(), channelName, us.channelUrl);
             loadCachedInfo((streams, statusCode) -> {
                 if (streams == null) {
                     LOG.warn("{}[{}] error loading streams info: {}", rid, user.getId(), statusCode);
@@ -297,7 +334,7 @@ public class IptvServerChannel {
     }
 
     private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user, UserStreams us) {
-        HttpRequest req = createRequest(channelUrl, user).build();
+        HttpRequest req = createRequest(us.channelUrl, user).build();
 
         LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, channelUrl, retryNo);
 
@@ -352,6 +389,14 @@ public class IptvServerChannel {
 
                                 sb.append(l).append("\n");
                             } else {
+                                // transform url
+                                if (!l.startsWith("http://") && !l.startsWith("https://")) {
+                                    int idx = channelUrl.lastIndexOf('/');
+                                    if (idx >= 0) {
+                                        l = channelUrl.substring(0, idx + 1) + l;
+                                    }
+                                }
+
                                 String path = digest.digest(l) + ".ts";
                                 Stream s = new Stream(path, l, sb.toString(), startTime, durationMillis);
                                 streamMap.put(path, s);
@@ -412,5 +457,63 @@ public class IptvServerChannel {
                         }
                     }
                 });
+    }
+
+    private UserStreams createUserStreams(HttpServerExchange exchange, IptvUser user) {
+        String url = createChannelUrl(exchange);
+
+        // user is locked here
+        UserStreams us = userStreams.get(user.getId());
+        if (us == null || !us.channelUrl.equals(url)) {
+            us = new UserStreams(defaultInfoTimeout, url);
+            userStreams.put(user.getId(), us);
+        }
+
+        return us;
+    }
+
+    private String createChannelUrl(HttpServerExchange exchange) {
+        Map<String, String> qp = new TreeMap<>();
+        exchange.getQueryParameters().forEach((k, v) -> {
+            // skip our token tag
+            if (!"t".equals(k)) {
+                if (v.size() > 0) {
+                    qp.put(k, v.getFirst());
+                }
+            }
+        });
+
+        if (qp.isEmpty()) {
+            return channelUrl;
+        }
+
+        URI uri;
+
+        try {
+            uri = new URI(channelUrl);
+        } catch (URISyntaxException se) {
+            throw new RuntimeException(se);
+        }
+
+        for (String pair : uri.getRawQuery().split("&")) {
+            int idx = pair.indexOf('=');
+            String key = URLDecoder.decode(idx >= 0 ? pair.substring(0, idx) : pair, StandardCharsets.UTF_8);
+            String value = idx < 0 ? null : URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8);
+            qp.putIfAbsent(key, value);
+        }
+
+        StringBuilder q = new StringBuilder();
+        qp.forEach((k, v) -> {
+            if (q.length() > 0) {
+                q.append('&');
+            }
+
+            q.append(URLEncoder.encode(k, StandardCharsets.UTF_8));
+            if (v != null) {
+                q.append('=').append(URLEncoder.encode(v, StandardCharsets.UTF_8));
+            }
+        });
+
+        return q.toString();
     }
 }
