@@ -36,10 +36,6 @@ import org.slf4j.LoggerFactory;
 public class IptvProxyService implements HttpHandler {
     private static final Logger LOG = LoggerFactory.getLogger(IptvProxyService.class);
 
-    private static final long CHANNELS_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(60);
-    private static final long CHANNELS_CONNECT_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
-    private static final long CHANNELS_RETRY_DELAY_MS = 1000;
-
     private static final Pattern PAT_TVGID = Pattern.compile(".*tvg-id=\"(?<tvgid>[^\"]+)\".*");
 
     private final Undertow undertow;
@@ -59,7 +55,9 @@ public class IptvProxyService implements HttpHandler {
     private final boolean allowAnonymous;
     private final Set<String> allowedUsers;
 
-    private final int connectTimeoutSec;
+    private final long channelsTimeoutSec;
+    private final long channelsTotalTimeoutSec;
+    private final long channelsRetryDelayMs;
 
     public IptvProxyService(IptvProxyConfig config) {
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
@@ -69,7 +67,9 @@ public class IptvProxyService implements HttpHandler {
         this.allowAnonymous = config.getAllowAnonymous();
         this.allowedUsers = config.getUsers();
 
-        this.connectTimeoutSec = config.getConnectTimeoutSec();
+        this.channelsTimeoutSec = config.getChannelsTimeoutSec();
+        this.channelsTotalTimeoutSec = config.getChannelsTotalTimeoutSec();
+        this.channelsRetryDelayMs = config.getChannelsRetryDelayMs();
 
         undertow = Undertow.builder()
                 .addHttpListener(config.getPort(), config.getHost())
@@ -172,14 +172,14 @@ public class IptvProxyService implements HttpHandler {
                         LOG.warn("skipping malformed channel: {}, server: {}", line, server.getName());
                     } else {
                         // TODO we need proper ID generation in order to be able to merge channels
-                        String id = digest.digest(chanId == null ? name : chanId);
-                        //String id = digest.digest(line);
+                        //String id = digest.digest(chanId == null ? name : chanId);
+                        String id = digest.digest(name);
                         final String _name = name;
                         IptvChannel channel = chs.computeIfAbsent(id, k -> new IptvChannel(id, _name, info.toArray(new String[0])));
 
                         IptvServerChannel serverChannel = serverChannelsByUrl.get(line);
                         if (serverChannel == null) {
-                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, connectTimeoutSec, timer);
+                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, timer);
                         }
 
                         channel.addServerChannel(serverChannel);
@@ -206,7 +206,7 @@ public class IptvProxyService implements HttpHandler {
         final String rid = RequestCounter.next();
 
         var future = new CompletableFuture<String>();
-        loadChannelsAsync(name, url, httpClient, 0, System.currentTimeMillis() + CHANNELS_TIMEOUT_MS, rid, future);
+        loadChannelsAsync(name, url, httpClient, 0, System.currentTimeMillis() + channelsTotalTimeoutSec, rid, future);
         return future;
     }
 
@@ -218,7 +218,7 @@ public class IptvProxyService implements HttpHandler {
 
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofMillis(CHANNELS_CONNECT_TIMEOUT_MS))
+                .timeout(Duration.ofMillis(channelsTimeoutSec))
                 .build();
 
         httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
@@ -234,7 +234,7 @@ public class IptvProxyService implements HttpHandler {
                                 public void run() {
                                     loadChannelsAsync(name, url, httpClient, retryNo + 1, expireTime, rid, future);
                                 }
-                            }, CHANNELS_RETRY_DELAY_MS);
+                            }, channelsRetryDelayMs);
                         } else {
                             LOG.error("{}failed", rid);
                             future.complete(null);
@@ -367,7 +367,7 @@ public class IptvProxyService implements HttpHandler {
         chs.sort(Comparator.comparing(IptvChannel::getName));
 
         StringBuilder sb = new StringBuilder();
-        sb.append("#EXTM3U\n");
+        sb.append("#EXTM3U catchup-days=\"7\" catchup=\"shift\" catchup-type=\"shift\"\n");
 
         chs.forEach(ch -> {
             for (String i : ch.getInfo()) {

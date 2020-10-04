@@ -14,7 +14,9 @@ public class IptvProxyConfig {
     private List<IptvServerConfig> servers;
     private boolean allowAnonymous = true;
     private Set<String> users = new HashSet<>();
-    private int connectTimeoutSec = 2;
+    private long channelsTimeoutSec = 5;
+    private long channelsTotalTimeoutSec = 60;
+    private long channelsRetryDelayMs = 1000;
 
     protected IptvProxyConfig() {
         // for deserialization
@@ -23,7 +25,8 @@ public class IptvProxyConfig {
     public IptvProxyConfig(
             String host, int port, String baseUrl, String forwardedPass,
             String tokenSalt, List<IptvServerConfig> servers,
-            boolean allowAnonymous, Set<String> users, int connectTimeoutSec
+            boolean allowAnonymous, Set<String> users,
+            int channelsTimeoutSec, int channelsTotalTimeoutSec, long channelsRetryDelayMs
     ) {
         this.host = host;
         this.port = port;
@@ -33,7 +36,9 @@ public class IptvProxyConfig {
         this.servers = new ArrayList<>(servers);
         this.allowAnonymous = allowAnonymous;
         this.users = new HashSet<>(users);
-        this.connectTimeoutSec = connectTimeoutSec;
+        this.channelsTimeoutSec = channelsTimeoutSec;
+        this.channelsTotalTimeoutSec = channelsTotalTimeoutSec;
+        this.channelsRetryDelayMs = channelsRetryDelayMs;
     }
 
     public String getHost() {
@@ -68,7 +73,15 @@ public class IptvProxyConfig {
         return users;
     }
 
-    public int getConnectTimeoutSec() {
-        return connectTimeoutSec;
+    public long getChannelsTimeoutSec() {
+        return channelsTimeoutSec;
+    }
+
+    public long getChannelsTotalTimeoutSec() {
+        return channelsTotalTimeoutSec;
+    }
+
+    public long getChannelsRetryDelayMs() {
+        return channelsRetryDelayMs;
     }
 }

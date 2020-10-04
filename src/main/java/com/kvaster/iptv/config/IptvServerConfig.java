@@ -7,8 +7,13 @@ public class IptvServerConfig {
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
-    private long infoTimeoutSec = 3;
+    private long infoTimeoutSec = 2;
+    private long infoTotalTimeoutSec = 3;
     private long infoRetryDelayMs = 500;
+    private long catchupTimeoutSec = 5;
+    private long catchupTotalTimeoutSec = 10;
+    private long catchupRetryDelayMs = 500;
+    private long streamConnectTimeoutSec = 2;
 
     protected IptvServerConfig() {
         // for deserialization
@@ -59,7 +64,27 @@ public class IptvServerConfig {
         return infoTimeoutSec;
     }
 
+    public long getInfoTotalTimeoutSec() {
+        return infoTotalTimeoutSec;
+    }
+
     public long getInfoRetryDelayMs() {
         return infoRetryDelayMs;
+    }
+
+    public long getCatchupTimeoutSec() {
+        return catchupTimeoutSec;
+    }
+
+    public long getCatchupTotalTimeoutSec() {
+        return catchupTotalTimeoutSec;
+    }
+
+    public long getCatchupRetryDelayMs() {
+        return catchupRetryDelayMs;
+    }
+
+    public long getStreamConnectTimeoutSec() {
+        return streamConnectTimeoutSec;
     }
 }

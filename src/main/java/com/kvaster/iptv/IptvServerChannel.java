@@ -47,13 +47,13 @@ public class IptvServerChannel {
     private final String channelName;
 
     private final HttpClient httpClient;
-    private final int connectTimeoutSec;
 
     private final Timer timer;
 
     private volatile long failedUntil;
 
     private final long defaultInfoTimeout;
+    private final long defaultCatchupTimeout;
 
     private final boolean isHls;
 
@@ -95,6 +95,7 @@ public class IptvServerChannel {
         Map<String, Stream> streamMap = new HashMap<>();
         long infoTimeout;
         String channelUrl;
+        boolean isCatchup;
 
         UserStreams(long infoTimeout, String channelUrl) {
             this.infoTimeout = infoTimeout;
@@ -126,8 +127,7 @@ public class IptvServerChannel {
 
     public IptvServerChannel(
             IptvServer server, String channelUrl, BaseUrl baseUrl,
-            String channelId, String channelName, int connectTimeoutSec,
-            Timer timer
+            String channelId, String channelName, Timer timer
     ) {
         this.server = server;
         this.channelUrl = channelUrl;
@@ -136,11 +136,11 @@ public class IptvServerChannel {
         this.channelName = channelName;
 
         this.httpClient = server.getHttpClient();
-        this.connectTimeoutSec = connectTimeoutSec;
 
         this.timer = timer;
 
-        defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(0, Math.max(connectTimeoutSec, server.getInfoTimeoutSec())) + 1);
+        defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(server.getInfoTotalTimeoutSec(), server.getInfoTimeoutSec()) + 1);
+        defaultCatchupTimeout = TimeUnit.SECONDS.toMillis(Math.max(server.getCatchupTotalTimeoutSec(), server.getCatchupTimeoutSec()) + 1);
 
         try {
             URI uri = new URI(channelUrl);
@@ -179,10 +179,10 @@ public class IptvServerChannel {
         userStreams.remove(userId);
     }
 
-    private HttpRequest.Builder createRequest(String url, IptvUser user) {
+    private HttpRequest.Builder createRequest(String url, IptvUser user, long timeoutSec) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(connectTimeoutSec));
+                .timeout(Duration.ofSeconds(timeoutSec));
 
         // send user id to next iptv-proxy
         if (server.getSendUser()) {
@@ -261,10 +261,10 @@ public class IptvServerChannel {
         }
 
         // be sure we have time to start stream
-        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(connectTimeoutSec));
+        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getStreamConnectTimeoutSec()));
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-            HttpRequest req = createRequest(url, user).build();
+            HttpRequest req = createRequest(url, user, server.getStreamConnectTimeoutSec()).build();
 
             // configure buffering according to undertow buffers settings for best performance
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
@@ -336,7 +336,7 @@ public class IptvServerChannel {
             loadInfo(
                     RequestCounter.next(),
                     0,
-                    System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getInfoTimeoutSec()),
+                    System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(us.isCatchup ? server.getCatchupTotalTimeoutSec() : server.getInfoTotalTimeoutSec()),
                     user,
                     us
             );
@@ -346,9 +346,9 @@ public class IptvServerChannel {
     }
 
     private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user, UserStreams us) {
-        HttpRequest req = createRequest(us.channelUrl, user).build();
+        HttpRequest req = createRequest(us.channelUrl, user, us.isCatchup ? server.getCatchupTimeoutSec() : server.getInfoTimeoutSec()).build();
 
-        LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, channelUrl, retryNo);
+        LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, us.channelUrl, retryNo);
 
         httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
                 .whenComplete((resp, err) -> {
@@ -449,7 +449,7 @@ public class IptvServerChannel {
                                 public void run() {
                                     loadInfo(rid, retryNo + 1, expireTime, user, us);
                                 }
-                            }, server.getInfoRetryDelayMs());
+                            }, us.isCatchup ? server.getCatchupRetryDelayMs() : server.getInfoRetryDelayMs());
                         } else {
                             if (server.getChannelFailedMs() > 0) {
                                 user.lock();
@@ -477,7 +477,10 @@ public class IptvServerChannel {
         // user is locked here
         UserStreams us = userStreams.get(user.getId());
         if (us == null || !us.channelUrl.equals(url)) {
-            us = new UserStreams(defaultInfoTimeout, url);
+            boolean isCatchup = exchange.getQueryParameters().containsKey("utc") ||
+                    exchange.getQueryParameters().containsKey("lutc");
+            us = new UserStreams(isCatchup ? defaultCatchupTimeout : defaultInfoTimeout, url);
+            us.isCatchup = isCatchup;
             userStreams.put(user.getId(), us);
         }
 
@@ -507,11 +510,13 @@ public class IptvServerChannel {
             throw new RuntimeException(se);
         }
 
-        for (String pair : uri.getRawQuery().split("&")) {
-            int idx = pair.indexOf('=');
-            String key = URLDecoder.decode(idx >= 0 ? pair.substring(0, idx) : pair, StandardCharsets.UTF_8);
-            String value = idx < 0 ? null : URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8);
-            qp.putIfAbsent(key, value);
+        if (uri.getRawQuery() != null && !uri.getRawQuery().isBlank()) {
+            for (String pair : uri.getRawQuery().split("&")) {
+                int idx = pair.indexOf('=');
+                String key = URLDecoder.decode(idx >= 0 ? pair.substring(0, idx) : pair, StandardCharsets.UTF_8);
+                String value = idx < 0 ? null : URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8);
+                qp.putIfAbsent(key, value);
+            }
         }
 
         StringBuilder q = new StringBuilder();
@@ -526,6 +531,13 @@ public class IptvServerChannel {
             }
         });
 
-        return q.toString();
+        try {
+            return new URI(
+                    uri.getScheme(), uri.getUserInfo(), uri.getHost(),
+                    uri.getPort(), uri.getPath(), q.toString(), uri.getFragment()
+            ).toString();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

@@ -14,7 +14,12 @@ public class IptvServer {
     private final boolean proxyStream;
     private final long channelFailedMs;
     private final long infoTimeoutSec;
+    private final long infoTotalTimeoutSec;
     private final long infoRetryDelayMs;
+    private final long catchupTimeoutSec;
+    private final long catchupTotalTimeoutSec;
+    private final long catchupRetryDelayMs;
+    private final long streamConnectTimeoutSec;
 
     private final HttpClient httpClient;
 
@@ -24,14 +29,18 @@ public class IptvServer {
         this(
                 sc.getName(), sc.getUrl(), sc.getMaxConnections(),
                 sc.getSendUser(), sc.getProxyStream(), sc.getChannelFailedMs(),
-                sc.getInfoTimeoutSec(), sc.getInfoRetryDelayMs()
+                sc.getInfoTimeoutSec(), sc.getInfoTotalTimeoutSec(), sc.getInfoRetryDelayMs(),
+                sc.getCatchupTimeoutSec(), sc.getCatchupTotalTimeoutSec(), sc.getCatchupRetryDelayMs(),
+                sc.getStreamConnectTimeoutSec()
         );
     }
 
     public IptvServer(String name, String url, int maxConnections,
             boolean sendUser, boolean proxyStream,
             long channelFailedMs,
-            long infoTimeoutSec, long infoRetryDelayMs
+            long infoTimeoutSec, long infoTotalTimeoutSec, long infoRetryDelayMs,
+            long catchupTimeoutSec, long catchupTotalTimeoutSec, long catchupRetryDelayMs,
+            long streamConnectTimeoutSec
     ) {
         this.name = name;
         this.url = url;
@@ -40,7 +49,12 @@ public class IptvServer {
         this.proxyStream = proxyStream;
         this.channelFailedMs = channelFailedMs;
         this.infoTimeoutSec = infoTimeoutSec;
+        this.infoTotalTimeoutSec = infoTotalTimeoutSec;
         this.infoRetryDelayMs = infoRetryDelayMs;
+        this.catchupTimeoutSec = catchupTimeoutSec;
+        this.catchupTotalTimeoutSec = catchupTotalTimeoutSec;
+        this.catchupRetryDelayMs = catchupRetryDelayMs;
+        this.streamConnectTimeoutSec = streamConnectTimeoutSec;
 
         httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.ALWAYS)
@@ -75,8 +89,28 @@ public class IptvServer {
         return infoTimeoutSec;
     }
 
+    public long getInfoTotalTimeoutSec() {
+        return infoTotalTimeoutSec;
+    }
+
     public long getInfoRetryDelayMs() {
         return infoRetryDelayMs;
+    }
+
+    public long getCatchupTimeoutSec() {
+        return catchupTimeoutSec;
+    }
+
+    public long getCatchupTotalTimeoutSec() {
+        return catchupTotalTimeoutSec;
+    }
+
+    public long getCatchupRetryDelayMs() {
+        return catchupRetryDelayMs;
+    }
+
+    public long getStreamConnectTimeoutSec() {
+        return streamConnectTimeoutSec;
     }
 
     public synchronized boolean acquire() {
