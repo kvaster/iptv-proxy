@@ -8,6 +8,8 @@ you have 4 tv in your house and you never watch more then 2 tv at the same time.
 In this case you can setup two playlists in iptv proxy and they will be dynamically
 allocated to active tv.
 
+Also iptvproxy can combine different iptv providers. It will combine both - playlist and xmltv data (if available).
+
 ## Configuration
 
 ```yaml
@@ -21,11 +23,16 @@ channels_total_timeout_sec: 60
 channels_retry_delay_ms: 1000
 servers:
   - name: someiptv-1
-    url: https://someiptv.com/playlist.m3u
-    max_connections: 1
-  - name: another_proxy-2
-    url: https://iptv-proxy.example.com/playlist.m3u
-    max_connections: 4
+    connections:
+      - url: https://someiptv.com/playlist.m3u
+        max_connections: 1
+  - name: someiptv-2
+    connections:
+      - url: https://iptv-proxy.example.com/playlist.m3u
+        max_connections: 4
+      - url: https://iptv-proxy.example.com/playlist2.m3u
+        max_connections: 2
+    xmltv_url: https://epg.example.com/epg.xml.gz
     send_user: true
     proxy_stream: true
     channel_failed_ms: 1000
@@ -89,3 +96,5 @@ or
 `<base_url>/m3u`
 
 for anonymous access.
+
+For xmltv you should use `<base_url>/epg.xml.gz`
