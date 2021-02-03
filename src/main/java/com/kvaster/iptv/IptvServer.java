@@ -2,6 +2,7 @@ package com.kvaster.iptv;
 
 import java.net.http.HttpClient;
 
+import com.kvaster.iptv.config.IptvConnectionConfig;
 import com.kvaster.iptv.config.IptvServerConfig;
 
 public class IptvServer {
@@ -25,9 +26,9 @@ public class IptvServer {
 
     private int acquired;
 
-    public IptvServer(IptvServerConfig sc) {
+    public IptvServer(IptvServerConfig sc, IptvConnectionConfig cc) {
         this(
-                sc.getName(), sc.getUrl(), sc.getMaxConnections(),
+                sc.getName(), cc.getUrl(), cc.getMaxConnections(),
                 sc.getSendUser(), sc.getProxyStream(), sc.getChannelFailedMs(),
                 sc.getInfoTimeoutSec(), sc.getInfoTotalTimeoutSec(), sc.getInfoRetryDelayMs(),
                 sc.getCatchupTimeoutSec(), sc.getCatchupTotalTimeoutSec(), sc.getCatchupRetryDelayMs(),

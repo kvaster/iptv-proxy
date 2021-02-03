@@ -1,11 +1,6 @@
 package com.kvaster.iptv;
 
 import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,9 +50,7 @@ public class IptvProxyService implements HttpHandler {
     private final boolean allowAnonymous;
     private final Set<String> allowedUsers;
 
-    private final long channelsTimeoutSec;
-    private final long channelsTotalTimeoutSec;
-    private final long channelsRetryDelayMs;
+    private final AsyncLoader<String> channelsLoader;
 
     public IptvProxyService(IptvProxyConfig config) {
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
@@ -67,9 +60,7 @@ public class IptvProxyService implements HttpHandler {
         this.allowAnonymous = config.getAllowAnonymous();
         this.allowedUsers = config.getUsers();
 
-        this.channelsTimeoutSec = config.getChannelsTimeoutSec();
-        this.channelsTotalTimeoutSec = config.getChannelsTotalTimeoutSec();
-        this.channelsRetryDelayMs = config.getChannelsRetryDelayMs();
+        channelsLoader = AsyncLoader.stringLoader(config.getChannelsTimeoutSec(), config.getChannelsTotalTimeoutSec(), config.getChannelsRetryDelayMs(), timer);
 
         undertow = Undertow.builder()
                 .addHttpListener(config.getPort(), config.getHost())
@@ -77,7 +68,7 @@ public class IptvProxyService implements HttpHandler {
                 .build();
 
         List<IptvServer> ss = new ArrayList<>();
-        config.getServers().forEach((sc) -> ss.add(new IptvServer(sc)));
+        config.getServers().forEach((sc) -> sc.getConnections().forEach((cc) -> ss.add(new IptvServer(sc, cc))));
         servers = Collections.unmodifiableList(ss);
     }
 
@@ -126,7 +117,7 @@ public class IptvProxyService implements HttpHandler {
         Digest digest = Digest.sha256();
 
         Map<IptvServer, CompletableFuture<String>> loads = new HashMap<>();
-        servers.forEach((s) -> loads.put(s, loadChannelsAsync(s.getName(), s.getUrl(), s.getHttpClient())));
+        servers.forEach((s) -> loads.put(s, channelsLoader.loadAsync(s.getName(), s.getUrl(), s.getHttpClient())));
 
         for (IptvServer server : servers) {
             String channels = null;
@@ -200,47 +191,6 @@ public class IptvProxyService implements HttpHandler {
         LOG.info("channels updated.");
 
         return true;
-    }
-
-    private CompletableFuture<String> loadChannelsAsync(String name, String url, HttpClient httpClient) {
-        final String rid = RequestCounter.next();
-
-        var future = new CompletableFuture<String>();
-        loadChannelsAsync(name, url, httpClient, 0, System.currentTimeMillis() + channelsTotalTimeoutSec, rid, future);
-        return future;
-    }
-
-    private void loadChannelsAsync(
-            String name, String url, HttpClient httpClient, int retryNo,
-            long expireTime, String rid, CompletableFuture<String> future
-    ) {
-        LOG.info("{}loading playlist: {}, retry: {}", rid, name, retryNo);
-
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMillis(channelsTimeoutSec))
-                .build();
-
-        httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                .whenComplete((resp, err) -> {
-                    if (HttpUtils.isOk(resp, err, rid)) {
-                        future.complete(resp.body());
-                    } else {
-                        if (System.currentTimeMillis() < expireTime) {
-                            LOG.warn("{}will retry", rid);
-
-                            timer.schedule(new TimerTask() {
-                                @Override
-                                public void run() {
-                                    loadChannelsAsync(name, url, httpClient, retryNo + 1, expireTime, rid, future);
-                                }
-                            }, channelsRetryDelayMs);
-                        } else {
-                            LOG.error("{}failed", rid);
-                            future.complete(null);
-                        }
-                    }
-                });
     }
 
     @Override

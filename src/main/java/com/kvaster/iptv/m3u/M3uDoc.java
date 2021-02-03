@@ -2,7 +2,6 @@ package com.kvaster.iptv.m3u;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class M3uDoc {
     private final List<M3uChannel> channels;

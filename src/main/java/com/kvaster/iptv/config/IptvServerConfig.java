@@ -1,9 +1,11 @@
 package com.kvaster.iptv.config;
 
+import java.util.List;
+
 public class IptvServerConfig {
     private String name;
-    private String url;
-    private int maxConnections;
+    private List<IptvConnectionConfig> connections;
+    private String xmltvUrl;
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
@@ -20,15 +22,18 @@ public class IptvServerConfig {
     }
 
     public IptvServerConfig(
-            String name, String url, int maxConnections,
-            boolean sendUser, boolean proxyStream,
+            String name,
+            List<IptvConnectionConfig> connections,
+            String xmltvUrl,
+            boolean sendUser,
+            boolean proxyStream,
             long channelFailedMs,
             long infoTimeoutSec,
             long infoRetryDelayMs
     ) {
         this.name = name;
-        this.url = url;
-        this.maxConnections = maxConnections;
+        this.connections = connections;
+        this.xmltvUrl = xmltvUrl;
         this.sendUser = sendUser;
         this.proxyStream = proxyStream;
         this.channelFailedMs = channelFailedMs;
@@ -37,15 +42,15 @@ public class IptvServerConfig {
     }
 
     public String getName() {
-        return name == null ? url : name;
+        return name;
     }
 
-    public String getUrl() {
-        return url;
+    public List<IptvConnectionConfig> getConnections() {
+        return connections;
     }
 
-    public int getMaxConnections() {
-        return maxConnections;
+    public String getXmltvUrl() {
+        return xmltvUrl;
     }
 
     public boolean getSendUser() {
