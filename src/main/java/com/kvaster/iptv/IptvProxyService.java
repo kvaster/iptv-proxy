@@ -7,7 +7,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -160,6 +159,8 @@ public class IptvProxyService implements HttpHandler {
         for (IptvServerGroup sg : serverGroups) {
             XmltvDoc xmltv = null;
             if (sg.xmltvUrl != null) {
+                LOG.info("waiting for xmltv data to be downloaded");
+
                 byte[] data = null;
 
                 try {
@@ -169,6 +170,8 @@ public class IptvProxyService implements HttpHandler {
                 }
 
                 if (data != null) {
+                    LOG.info("parsing xmltv data");
+
                     xmltv = XmltvUtils.parseXmltv(data);
                     if (xmltv != null) {
                         sg.xmltvCache = data;
@@ -186,7 +189,9 @@ public class IptvProxyService implements HttpHandler {
             if (xmltv != null) {
                 xmltv.getChannels().forEach(ch -> {
                     xmltvById.put(ch.getId(), ch);
-                    ch.getDisplayNames().forEach(n -> xmltvByName.put(n.getText(), ch));
+                    if (ch.getDisplayNames() != null) {
+                        ch.getDisplayNames().forEach(n -> xmltvByName.put(n.getText(), ch));
+                    }
                 });
             }
 
