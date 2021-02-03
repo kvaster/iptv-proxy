@@ -17,6 +17,9 @@ public class IptvProxyConfig {
     private long channelsTimeoutSec = 5;
     private long channelsTotalTimeoutSec = 60;
     private long channelsRetryDelayMs = 1000;
+    private long xmltvTimeoutSec = 30;
+    private long xmltvTotalTimeoutSec = 120;
+    private long xmltvRetryDelayMs = 1000;
 
     protected IptvProxyConfig() {
         // for deserialization
@@ -83,5 +86,17 @@ public class IptvProxyConfig {
 
     public long getChannelsRetryDelayMs() {
         return channelsRetryDelayMs;
+    }
+
+    public long getXmltvTimeoutSec() {
+        return xmltvTimeoutSec;
+    }
+
+    public long getXmltvTotalTimeoutSec() {
+        return xmltvTotalTimeoutSec;
+    }
+
+    public long getXmltvRetryDelayMs() {
+        return xmltvRetryDelayMs;
     }
 }

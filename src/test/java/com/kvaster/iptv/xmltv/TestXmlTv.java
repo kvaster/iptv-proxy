@@ -11,7 +11,7 @@ public class TestXmlTv {
 
     public static void main(String[] args) {
         try {
-            XmlMapper xm = XmlTvUtils.createMapper();
+            XmlMapper xm = XmltvUtils.createMapper();
 
             XmltvDoc doc = xm.readValue(new File("/home/kva/projects/kvaster/iptv/epg-cbilling.xml"), XmltvDoc.class);
             //doc = xm.readValue(new File("/home/kva/projects/kvaster/iptv/epg-crdru.xml"), XmltvDoc.class);

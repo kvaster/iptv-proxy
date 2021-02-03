@@ -1,11 +1,13 @@
 package com.kvaster.iptv;
 
 import java.net.HttpURLConnection;
+import java.net.http.HttpClient;
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,10 +18,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.kvaster.iptv.config.IptvProxyConfig;
+import com.kvaster.iptv.m3u.M3uDoc;
+import com.kvaster.iptv.m3u.M3uParser;
+import com.kvaster.iptv.xmltv.XmltvChannel;
+import com.kvaster.iptv.xmltv.XmltvDoc;
+import com.kvaster.iptv.xmltv.XmltvUtils;
 import com.kvaster.utils.digest.Digest;
 import io.undertow.Undertow;
 import io.undertow.server.HttpHandler;
@@ -31,7 +36,19 @@ import org.slf4j.LoggerFactory;
 public class IptvProxyService implements HttpHandler {
     private static final Logger LOG = LoggerFactory.getLogger(IptvProxyService.class);
 
-    private static final Pattern PAT_TVGID = Pattern.compile(".*tvg-id=\"(?<tvgid>[^\"]+)\".*");
+    private static class IptvServerGroup {
+        final String name;
+        final List<IptvServer> servers = new ArrayList<>();
+
+        final String xmltvUrl;
+
+        byte[] xmltvCache;
+
+        IptvServerGroup(String name, String xmltvUrl) {
+            this.name = name;
+            this.xmltvUrl = xmltvUrl;
+        }
+    }
 
     private final Undertow undertow;
     private final Timer timer = new Timer();
@@ -41,7 +58,7 @@ public class IptvProxyService implements HttpHandler {
 
     private final AtomicLong idCounter = new AtomicLong(System.currentTimeMillis());
 
-    private final List<IptvServer> servers;
+    private final List<IptvServerGroup> serverGroups = new ArrayList<>();
     private volatile Map<String, IptvChannel> channels = new HashMap<>();
     private Map<String, IptvServerChannel> serverChannelsByUrl = new HashMap<>();
 
@@ -51,6 +68,12 @@ public class IptvProxyService implements HttpHandler {
     private final Set<String> allowedUsers;
 
     private final AsyncLoader<String> channelsLoader;
+    private final AsyncLoader<byte[]> xmltvLoader;
+    private volatile byte[] xmltvData = null;
+
+    private final HttpClient defaultHttpClient = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.ALWAYS)
+            .build();
 
     public IptvProxyService(IptvProxyConfig config) {
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
@@ -61,15 +84,18 @@ public class IptvProxyService implements HttpHandler {
         this.allowedUsers = config.getUsers();
 
         channelsLoader = AsyncLoader.stringLoader(config.getChannelsTimeoutSec(), config.getChannelsTotalTimeoutSec(), config.getChannelsRetryDelayMs(), timer);
+        xmltvLoader = AsyncLoader.bytesLoader(config.getXmltvTimeoutSec(), config.getXmltvTotalTimeoutSec(), config.getXmltvRetryDelayMs(), timer);
 
         undertow = Undertow.builder()
                 .addHttpListener(config.getPort(), config.getHost())
                 .setHandler(this)
                 .build();
 
-        List<IptvServer> ss = new ArrayList<>();
-        config.getServers().forEach((sc) -> sc.getConnections().forEach((cc) -> ss.add(new IptvServer(sc, cc))));
-        servers = Collections.unmodifiableList(ss);
+        config.getServers().forEach((sc) -> {
+            IptvServerGroup sg = new IptvServerGroup(sc.getName(), sc.getXmltvUrl());
+            serverGroups.add(sg);
+            sc.getConnections().forEach((cc) -> sg.servers.add(new IptvServer(sc, cc)));
+        });
     }
 
     public void startService() {
@@ -115,76 +141,157 @@ public class IptvProxyService implements HttpHandler {
         Map<String, IptvServerChannel> byUrl = new HashMap<>();
 
         Digest digest = Digest.sha256();
+        Digest md5 = Digest.md5();
 
         Map<IptvServer, CompletableFuture<String>> loads = new HashMap<>();
-        servers.forEach((s) -> loads.put(s, channelsLoader.loadAsync(s.getName(), s.getUrl(), s.getHttpClient())));
-
-        for (IptvServer server : servers) {
-            String channels = null;
-
-            try {
-                channels = loads.get(server).get();
-            } catch (InterruptedException | ExecutionException e) {
-                LOG.error("error waiting for channels load", e);
+        Map<IptvServerGroup, CompletableFuture<byte[]>> xmltvLoads = new HashMap<>();
+        serverGroups.forEach((sg) -> {
+            if (sg.xmltvUrl != null) {
+                xmltvLoads.put(sg, xmltvLoader.loadAsync("xmltv: " + sg.name, sg.xmltvUrl, defaultHttpClient));
             }
+            sg.servers.forEach(s -> loads.put(s, channelsLoader.loadAsync("playlist: " + s.getName(), s.getUrl(), s.getHttpClient())));
+        });
 
-            if (channels == null) {
-                return false;
-            }
+        XmltvDoc newXmltv = new XmltvDoc()
+                .setChannels(new ArrayList<>())
+                .setProgrammes(new ArrayList<>())
+                .setGeneratorName("iptvproxy");
 
-            LOG.info("parsing playlist: {}", server.getName());
+        for (IptvServerGroup sg : serverGroups) {
+            XmltvDoc xmltv = null;
+            if (sg.xmltvUrl != null) {
+                byte[] data = null;
 
-            String name = null;
-            String chanId = null;
-            List<String> info = new ArrayList<>(10); // magic number, usually we have only 1-3 lines of info tags
-
-            for (String line : channels.split("\n")) {
-                line = line.trim();
-
-                //noinspection StatementWithEmptyBody
-                if (line.startsWith("#EXTM3U")) {
-                    // do nothing - m3u format tag
-                } else if (line.startsWith("#")) {
-                    info.add(line);
-
-                    if (line.startsWith("#EXTINF")) {
-                        int idx = line.lastIndexOf(',');
-                        if (idx >= 0) {
-                            name = line.substring(idx + 1);
-                        }
-
-                        Matcher m = PAT_TVGID.matcher(line);
-                        if (m.matches()) {
-                            chanId = m.group("tvgid");
-                        }
-                    }
-                } else {
-                    if (name == null) {
-                        LOG.warn("skipping malformed channel: {}, server: {}", line, server.getName());
-                    } else {
-                        // TODO we need proper ID generation in order to be able to merge channels
-                        //String id = digest.digest(chanId == null ? name : chanId);
-                        String id = digest.digest(name);
-                        final String _name = name;
-                        IptvChannel channel = chs.computeIfAbsent(id, k -> new IptvChannel(id, _name, info.toArray(new String[0])));
-
-                        IptvServerChannel serverChannel = serverChannelsByUrl.get(line);
-                        if (serverChannel == null) {
-                            serverChannel = new IptvServerChannel(server, line, baseUrl.forPath('/' + id), id, name, timer);
-                        }
-
-                        channel.addServerChannel(serverChannel);
-
-                        chs.put(id, channel);
-                        byUrl.put(line, serverChannel);
-                    }
-
-                    name = null;
-                    info.clear();
+                try {
+                    data = xmltvLoads.get(sg).get();
+                } catch (InterruptedException | ExecutionException e) {
+                    LOG.warn("error loading xmltv data");
                 }
+
+                if (data != null) {
+                    xmltv = XmltvUtils.parseXmltv(data);
+                    if (xmltv != null) {
+                        sg.xmltvCache = data;
+                    }
+                }
+
+                if (xmltv == null && sg.xmltvCache != null) {
+                    xmltv = XmltvUtils.parseXmltv(sg.xmltvCache);
+                }
+            }
+
+            Map<String, XmltvChannel> xmltvById = new HashMap<>();
+            Map<String, XmltvChannel> xmltvByName = new HashMap<>();
+
+            if (xmltv != null) {
+                xmltv.getChannels().forEach(ch -> {
+                    xmltvById.put(ch.getId(), ch);
+                    ch.getDisplayNames().forEach(n -> xmltvByName.put(n.getText(), ch));
+                });
+            }
+
+            Map<String, String> xmltvIds = new HashMap<>();
+
+            for (IptvServer server : sg.servers) {
+                LOG.info("parsing playlist: {}, url: {}", sg.name, server.getUrl());
+
+                String channels = null;
+
+                try {
+                    channels = loads.get(server).get();
+                } catch (InterruptedException | ExecutionException e) {
+                    LOG.error("error waiting for channels load", e);
+                }
+
+                if (channels == null) {
+                    return false;
+                }
+
+                M3uDoc m3u = M3uParser.parse(channels);
+                if (m3u == null) {
+                    LOG.error("error parsing m3u, update skipped");
+                    return false;
+                }
+
+                m3u.getChannels().forEach((c) -> {
+                    // Unique ID will be formed from server name and channel name.
+                    // It seems that there will be no any other suitable way to identify channel.
+                    final String id = digest.digest(sg.name + "||" + c.getName());
+                    final String url = c.getUrl();
+
+                    IptvChannel channel = chs.get(id);
+                    if (channel == null) {
+                        String tvgId = c.getProp("tvg-id");
+                        String tvgName = c.getProp("tvg-name");
+
+                        XmltvChannel xmltvCh = null;
+                        if (tvgId != null) {
+                            xmltvCh = xmltvById.get(tvgId);
+                        }
+                        if (xmltvCh == null && tvgName != null) {
+                            xmltvCh = xmltvByName.get(tvgName);
+                            if (xmltvCh == null) {
+                                xmltvCh = xmltvByName.get(tvgName.replace(' ', '_'));
+                            }
+                        }
+                        if (xmltvCh == null) {
+                            xmltvCh = xmltvByName.get(c.getName());
+                        }
+
+                        String logo = c.getProp("tvg-logo");
+                        if (logo == null && xmltvCh != null && xmltvCh.getIcon() != null && xmltvCh.getIcon().getSrc() != null) {
+                            logo = xmltvCh.getIcon().getSrc();
+                        }
+
+                        int days = 0;
+                        String daysStr = c.getProp("tvg-rec");
+                        if (daysStr == null) {
+                            daysStr = c.getProp("catchup-days");
+                        }
+                        if (daysStr != null) {
+                            try {
+                                days = Integer.parseInt(daysStr);
+                            } catch (NumberFormatException e) {
+                                LOG.warn("error parsing catchup days: {}, channel: {}", daysStr, c.getName());
+                            }
+                        }
+
+                        String xmltvId = xmltvCh == null ? null : xmltvCh.getId();
+                        if (xmltvId != null) {
+                            String newId = md5.digest(sg.name + '-' + xmltvId);
+                            if (xmltvIds.putIfAbsent(xmltvId, newId) == null) {
+                                newXmltv.getChannels().add(new XmltvChannel().setId(newId));
+                            }
+                            xmltvId = newId;
+                        }
+
+                        channel = new IptvChannel(id, c.getName(), logo, c.getGroups(), xmltvId, days);
+                        chs.put(id, channel);
+                    }
+
+                    IptvServerChannel serverChannel = serverChannelsByUrl.get(url);
+                    if (serverChannel == null) {
+                        serverChannel = new IptvServerChannel(server, url, baseUrl.forPath('/' + id), id, c.getName(), timer);
+                    }
+
+                    channel.addServerChannel(serverChannel);
+
+                    chs.put(id, channel);
+                    byUrl.put(url, serverChannel);
+                });
+            }
+
+            if (xmltv != null) {
+                xmltv.getProgrammes().forEach(p -> {
+                    String newId = xmltvIds.get(p.getChannel());
+                    if (newId != null) {
+                        newXmltv.getProgrammes().add(p.copy().setChannel(newId));
+                    }
+                });
             }
         }
 
+        xmltvData = XmltvUtils.writeXmltv(newXmltv);
         channels = chs;
         serverChannelsByUrl = byUrl;
 
@@ -210,6 +317,10 @@ public class IptvProxyService implements HttpHandler {
 
         if (path.startsWith("m3u")) {
             return handleM3u(exchange, path);
+        }
+
+        if (path.startsWith("epg.xml.gz")) {
+            return handleEpg(exchange);
         }
 
         // channels
@@ -317,16 +428,49 @@ public class IptvProxyService implements HttpHandler {
         chs.sort(Comparator.comparing(IptvChannel::getName));
 
         StringBuilder sb = new StringBuilder();
-        sb.append("#EXTM3U catchup-days=\"7\" catchup=\"shift\" catchup-type=\"shift\"\n");
+        sb.append("#EXTM3U\n");
 
         chs.forEach(ch -> {
-            for (String i : ch.getInfo()) {
-                sb.append(i).append("\n");
+            sb.append("#EXTINF:0");
+
+            if (ch.getXmltvId() != null) {
+                sb.append(" tvg-id=\"").append(ch.getXmltvId()).append('"');
             }
+
+            if (ch.getLogo() != null) {
+                sb.append(" tvg-logo=\"").append(ch.getLogo()).append('"');
+            }
+
+            if (ch.getCatchupDays() != 0) {
+                sb.append(" catchup=\"shift\" catchup-days=\"").append(ch.getCatchupDays()).append('"');
+            }
+
+            sb.append(',').append(ch.getName()).append("\n");
+
+            if (ch.getGroups().size() > 0) {
+                sb.append("#EXTGRP:").append(String.join(";", ch.getGroups())).append("\n");
+            }
+
             sb.append(baseUrl.getBaseUrl(exchange)).append('/').append(ch.getId()).append("/channel.m3u8?t=").append(token).append("\n");
         });
 
         exchange.getResponseSender().send(sb.toString());
+
+        return true;
+    }
+
+    private boolean handleEpg(HttpServerExchange exchange) {
+        byte[] epg = xmltvData;
+        if (epg == null) {
+            return false;
+        }
+
+        exchange.getResponseHeaders()
+                .add(Headers.CONTENT_TYPE, "application/octet-stream")
+                .add(Headers.CONTENT_DISPOSITION, "attachment; filename=epg.xml.gz")
+                .add(Headers.CONTENT_LENGTH, Integer.toString(epg.length));
+
+        exchange.getResponseSender().send(ByteBuffer.wrap(epg));
 
         return true;
     }

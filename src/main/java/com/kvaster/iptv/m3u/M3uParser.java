@@ -1,5 +1,7 @@
 package com.kvaster.iptv.m3u;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -9,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +21,7 @@ public class M3uParser {
 
     private static final Pattern TAG_PAT = Pattern.compile("#(\\w+)(?:[ :](.*))?");
     private static final Pattern PROP_PAT = Pattern.compile(" *([\\w-_]+)=\"([^\"]*)\"(.*)");
-    private static final Pattern INFO_PAT = Pattern.compile("([-+0-9]+) (.*),([^,]+)");
+    private static final Pattern INFO_PAT = Pattern.compile("([-+0-9]+) ?(.*),([^,]+)");
 
     public static M3uDoc parse(String content) {
         Map<String, String> m3uProps = Collections.emptyMap();//new HashMap<>();
@@ -49,7 +52,8 @@ public class M3uParser {
                             name = m.group(3);
                             props = parseProps(m.group(2));
                         } else {
-                            LOG.warn("malformed channel info: {}", infoLine);
+                            LOG.error("malformed channel info: {}", infoLine);
+                            return null;
                         }
                         break;
 

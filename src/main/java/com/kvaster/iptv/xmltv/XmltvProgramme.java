@@ -30,10 +30,25 @@ public class XmltvProgramme {
     public XmltvProgramme() {
     }
 
+    public XmltvProgramme(XmltvProgramme p) {
+        this.start = p.start;
+        this.stop = p.stop;
+        this.channel = p.channel;
+        this.category = p.category;
+        this.title = p.title;
+        this.desc = p.desc;
+        this.rating = p.rating;
+        this.icon = p.icon;
+    }
+
     public XmltvProgramme(String channel, ZonedDateTime start, ZonedDateTime stop) {
         this.channel = channel;
         this.start = start;
         this.stop = stop;
+    }
+
+    public XmltvProgramme copy() {
+        return new XmltvProgramme(this);
     }
 
     public String getChannel() {

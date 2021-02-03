@@ -13,6 +13,10 @@ public class XmltvText {
     public XmltvText() {
     }
 
+    public XmltvText(String text) {
+        this(text, null);
+    }
+
     public XmltvText(String text, String language) {
         this.text = text;
         this.language = language;

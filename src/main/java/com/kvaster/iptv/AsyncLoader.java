@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -45,7 +46,7 @@ public class AsyncLoader<T> {
         final String rid = RequestCounter.next();
 
         var future = new CompletableFuture<T>();
-        loadAsync(msg, url, 0, System.currentTimeMillis() + totalTimeoutSec, rid, future, httpClient);
+        loadAsync(msg, url, 0, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(totalTimeoutSec), rid, future, httpClient);
         return future;
     }
 
@@ -58,11 +59,11 @@ public class AsyncLoader<T> {
             CompletableFuture<T> future,
             HttpClient httpClient
     ) {
-        LOG.info("{}loading {}, retry: {}", rid, msg, retryNo);
+        LOG.info("{}loading {}, retry: {}, url: {}", rid, msg, retryNo, url);
 
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofMillis(timeoutSec))
+                .timeout(Duration.ofSeconds(timeoutSec))
                 .build();
 
         httpClient.sendAsync(req, handlerSupplier.get())
