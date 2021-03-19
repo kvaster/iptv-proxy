@@ -2,8 +2,10 @@ package com.kvaster.iptv;
 
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -408,6 +410,21 @@ public class IptvServerChannel {
                                         l = channelUrl.substring(0, idx + 1) + l;
                                     }
                                 }
+
+                                try {
+                                    URI streamUri = new URI(l);
+                                    // we need to redownload m3u8 if m3u8 is found insteadof .ts streams
+                                    if (streamUri.getPath().endsWith(".m3u8") || streamUri.getPath().endsWith(".m3u")) {
+                                        URI baseUri = new URI(us.channelUrl);
+                                        us.channelUrl = baseUri.resolve(streamUri).toString();
+                                        loadInfo(rid, retryNo, expireTime, user, us);
+                                        return;
+                                    }
+                                } catch (URISyntaxException e) {
+                                    // probably we need to just skip this ?
+                                    LOG.trace("error parsing stream url", e);
+                                }
+
 
                                 String path = digest.digest(l) + ".ts";
                                 Stream s = new Stream(path, l, sb.toString(), startTime, durationMillis);

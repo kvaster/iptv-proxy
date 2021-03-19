@@ -49,6 +49,8 @@ public class IptvProxyService implements HttpHandler {
         }
     }
 
+    private static final String TOKEN_TAG = "t";
+
     private final Undertow undertow;
     private final Timer timer = new Timer();
 
@@ -345,7 +347,7 @@ public class IptvProxyService implements HttpHandler {
         }
 
         // we need user if this is not m3u request
-        String token = exchange.getQueryParameters().getOrDefault("t", new ArrayDeque<>()).peek();
+        String token = exchange.getQueryParameters().getOrDefault(TOKEN_TAG, new ArrayDeque<>()).peek();
         String user = getUserFromToken(token);
 
         // pass user name from another iptv-proxy
@@ -456,7 +458,14 @@ public class IptvProxyService implements HttpHandler {
                 sb.append("#EXTGRP:").append(String.join(";", ch.getGroups())).append("\n");
             }
 
-            sb.append(baseUrl.getBaseUrl(exchange)).append('/').append(ch.getId()).append("/channel.m3u8?t=").append(token).append("\n");
+            sb.append(baseUrl.getBaseUrl(exchange))
+                    .append('/')
+                    .append(ch.getId())
+                    .append("/channel.m3u8?")
+                    .append(TOKEN_TAG)
+                    .append("=")
+                    .append(token)
+                    .append("\n");
         });
 
         exchange.getResponseSender().send(sb.toString());
