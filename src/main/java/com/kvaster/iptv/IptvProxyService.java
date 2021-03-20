@@ -129,17 +129,15 @@ public class IptvProxyService implements HttpHandler {
         LOG.info("stopped");
     }
 
-    private void scheduleChannelsUpdate(long delay, TimeUnit timeUnit) {
-        scheduler.schedule(() -> {
-            new Thread(this::updateChannels).start();
-        }, delay, timeUnit);
+    private void scheduleChannelsUpdate(long delayMins) {
+        scheduler.schedule(() -> new Thread(this::updateChannels).start(), delayMins, TimeUnit.MINUTES);
     }
 
     private void updateChannels() {
         if (updateChannelsImpl()) {
-            scheduleChannelsUpdate(240, TimeUnit.MINUTES);
+            scheduleChannelsUpdate(240);
         } else {
-            scheduleChannelsUpdate(1, TimeUnit.MINUTES);
+            scheduleChannelsUpdate(1);
         }
     }
 
