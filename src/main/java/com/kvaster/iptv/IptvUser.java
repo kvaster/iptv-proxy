@@ -1,7 +1,7 @@
 package com.kvaster.iptv;
 
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -16,19 +16,19 @@ public class IptvUser {
     private final String id;
     private final Lock lock = new ReentrantLock();
 
-    private final Timer timer;
+    private final ScheduledExecutorService scheduler;
     private final BiConsumer<String, IptvUser> unregister;
 
     private long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
 
-    private long taskTime;
-    private TimerTask task;
+    private long timeoutTime;
+    private ScheduledFuture<?> timeoutFuture;
 
     private volatile IptvServerChannel serverChannel;
 
-    public IptvUser(String id, Timer timer, BiConsumer<String, IptvUser> unregister) {
+    public IptvUser(String id, ScheduledExecutorService scheduler, BiConsumer<String, IptvUser> unregister) {
         this.id = id;
-        this.timer = timer;
+        this.scheduler = scheduler;
         this.unregister = unregister;
 
         LOG.info("[{}] user created", id);
@@ -39,7 +39,8 @@ public class IptvUser {
     }
 
     public void unlock() {
-        if (taskTime != expireTime) {
+        // small optimization to have less removes and Future recreates in priority queue
+        if (timeoutTime == 0 || timeoutTime > expireTime) {
             schedule();
         }
 
@@ -47,28 +48,20 @@ public class IptvUser {
     }
 
     private void schedule() {
-        if (task != null) {
-            task.cancel();
+        if (timeoutFuture != null) {
+            timeoutFuture.cancel(false);
         }
 
-        taskTime = expireTime;
-
-        task = new TimerTask() {
-            @Override
-            public void run() {
-                removeIfNeed();
-            }
-        };
-
         // 100ms jitter
-        timer.schedule(task, expireDelay() + 100);
+        timeoutFuture = scheduler.schedule(this::removeIfNeed, expireDelay() + 100, TimeUnit.MILLISECONDS);
+        timeoutTime = expireTime;
     }
 
     private void removeIfNeed() {
         lock();
         try {
             if (System.currentTimeMillis() < expireTime) {
-                taskTime = 0;
+                timeoutTime = 0;
                 schedule();
             } else {
                 unregister.accept(id, this);
@@ -91,13 +84,6 @@ public class IptvUser {
 
     public void setExpireTime(long expireTime) {
         this.expireTime = Math.max(this.expireTime, expireTime);
-    }
-
-    public void cancelTask() {
-        if (task != null) {
-            task.cancel();
-            task = null;
-        }
     }
 
     public void releaseChannel() {

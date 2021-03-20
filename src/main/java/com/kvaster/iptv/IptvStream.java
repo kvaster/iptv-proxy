@@ -8,6 +8,9 @@ import java.util.Queue;
 import java.util.concurrent.Flow.Subscriber;
 import java.util.concurrent.Flow.Subscription;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.undertow.io.IoCallback;
@@ -35,17 +38,43 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     private final SpeedMeter writeMeter;
 
     private final IptvUser user;
-    private final long timeout;
+    private final long userTimeout;
 
-    public IptvStream(HttpServerExchange exchange, String rid, IptvUser user, long timeout) {
+    private final ScheduledExecutorService scheduler;
+    private final long readTimeout;
+
+    private volatile long timeoutTime;
+    private volatile ScheduledFuture<?> timeoutFuture;
+
+    public IptvStream(HttpServerExchange exchange, String rid, IptvUser user, long userTimeout, long readTimeout, ScheduledExecutorService scheduler) {
         this.exchange = exchange;
         this.rid = rid;
 
         this.user = user;
-        this.timeout = timeout;
+        this.userTimeout = userTimeout;
+
+        this.scheduler = scheduler;
+        this.readTimeout = readTimeout;
 
         readMeter = new SpeedMeter(rid + "read: ");
         writeMeter = new SpeedMeter(rid + "write: ");
+
+        updateReadTimeout();
+        timeoutFuture = scheduler.schedule(this::onTimeout, readTimeout, TimeUnit.MILLISECONDS);
+    }
+
+    private void updateReadTimeout() {
+        timeoutTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + readTimeout;
+    }
+
+    private void onTimeout() {
+        long now = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+        if (now >= timeoutTime) {
+            LOG.warn("{}read timeout on loading stream", rid);
+            finish();
+        } else {
+            timeoutFuture = scheduler.schedule(this::onTimeout, timeoutTime - now, TimeUnit.MILLISECONDS);
+        }
     }
 
     @Override
@@ -61,6 +90,9 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     }
 
     private void finish() {
+        // cancel any timeouts
+        timeoutFuture.cancel(false);
+
         // subscription can't be null at this place
         subscription.cancel();
 
@@ -96,17 +128,19 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     }
 
     private boolean sendNext(ByteBuffer b) {
+        user.lock();
+        try {
+            user.setExpireTime(System.currentTimeMillis() + userTimeout);
+        } finally {
+            user.unlock();
+        }
+
+        updateReadTimeout();
+
         if (b == END_MARKER) {
             exchange.endExchange();
             //LOG.debug("{}write complete", rid);
             writeMeter.finish();
-
-            user.lock();
-            try {
-                user.setExpireTime(System.currentTimeMillis() + timeout);
-            } finally {
-                user.unlock();
-            }
 
             return true;
         }

@@ -2,10 +2,8 @@ package com.kvaster.iptv;
 
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -24,6 +22,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.kvaster.utils.digest.Digest;
@@ -50,7 +49,7 @@ public class IptvServerChannel {
 
     private final HttpClient httpClient;
 
-    private final Timer timer;
+    private final ScheduledExecutorService scheduler;
 
     private volatile long failedUntil;
 
@@ -129,7 +128,7 @@ public class IptvServerChannel {
 
     public IptvServerChannel(
             IptvServer server, String channelUrl, BaseUrl baseUrl,
-            String channelId, String channelName, Timer timer
+            String channelId, String channelName, ScheduledExecutorService scheduler
     ) {
         this.server = server;
         this.channelUrl = channelUrl;
@@ -139,7 +138,7 @@ public class IptvServerChannel {
 
         this.httpClient = server.getHttpClient();
 
-        this.timer = timer;
+        this.scheduler = scheduler;
 
         defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(server.getInfoTotalTimeoutSec(), server.getInfoTimeoutSec()) + 1);
         defaultCatchupTimeout = TimeUnit.SECONDS.toMillis(Math.max(server.getCatchupTotalTimeoutSec(), server.getCatchupTimeoutSec()) + 1);
@@ -183,8 +182,11 @@ public class IptvServerChannel {
 
     private HttpRequest.Builder createRequest(String url, IptvUser user, long timeoutSec) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(timeoutSec));
+                .uri(URI.create(url));
+
+        if (timeoutSec > 0) {
+            builder.timeout(Duration.ofSeconds(timeoutSec));
+        }
 
         // send user id to next iptv-proxy
         if (server.getSendUser()) {
@@ -263,20 +265,23 @@ public class IptvServerChannel {
         }
 
         // be sure we have time to start stream
-        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getStreamConnectTimeoutSec()));
+        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getConnectTimeoutSec()));
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-            HttpRequest req = createRequest(url, user, server.getStreamConnectTimeoutSec()).build();
+            // we should not limit overall time of stream connection
+            HttpRequest req = createRequest(url, user, 0).build();
 
             // configure buffering according to undertow buffers settings for best performance
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
+                    .orTimeout(server.getStreamStartTimeoutSec(), TimeUnit.SECONDS)
                     .whenComplete((resp, err) -> {
                         if (HttpUtils.isOk(resp, err, exchange, rid)) {
                             for (HttpString header : HEADERS) {
                                 resp.headers().firstValue(header.toString()).ifPresent(value -> exchange.getResponseHeaders().add(header, value));
                             }
 
-                            resp.body().subscribe(new IptvStream(exchange, rid, user, timeout));
+                            long readTimeoutMs = TimeUnit.SECONDS.toMillis(server.getStreamReadTimeoutSec());
+                            resp.body().subscribe(new IptvStream(exchange, rid, user, Math.max(timeout, readTimeoutMs), readTimeoutMs, scheduler));
                         }
                     });
         });
@@ -461,12 +466,11 @@ public class IptvServerChannel {
                         if (System.currentTimeMillis() < expireTime) {
                             LOG.info("{}[{}] will retry", rid, user.getId());
 
-                            timer.schedule(new TimerTask() {
-                                @Override
-                                public void run() {
-                                    loadInfo(rid, retryNo + 1, expireTime, user, us);
-                                }
-                            }, us.isCatchup ? server.getCatchupRetryDelayMs() : server.getInfoRetryDelayMs());
+                            scheduler.schedule(
+                                    () -> loadInfo(rid, retryNo + 1, expireTime, user, us),
+                                    us.isCatchup ? server.getCatchupRetryDelayMs() : server.getInfoRetryDelayMs(),
+                                    TimeUnit.MILLISECONDS
+                            );
                         } else {
                             if (server.getChannelFailedMs() > 0) {
                                 user.lock();

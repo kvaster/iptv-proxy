@@ -10,11 +10,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -52,7 +52,9 @@ public class IptvProxyService implements HttpHandler {
     private static final String TOKEN_TAG = "t";
 
     private final Undertow undertow;
-    private final Timer timer = new Timer();
+
+    // use two threads instead of one
+    private final ScheduledExecutorService scheduler = new ScheduledThreadPoolExecutor(2);
 
     private final BaseUrl baseUrl;
     private final String tokenSalt;
@@ -84,8 +86,8 @@ public class IptvProxyService implements HttpHandler {
         this.allowAnonymous = config.getAllowAnonymous();
         this.allowedUsers = config.getUsers();
 
-        channelsLoader = AsyncLoader.stringLoader(config.getChannelsTimeoutSec(), config.getChannelsTotalTimeoutSec(), config.getChannelsRetryDelayMs(), timer);
-        xmltvLoader = AsyncLoader.bytesLoader(config.getXmltvTimeoutSec(), config.getXmltvTotalTimeoutSec(), config.getXmltvRetryDelayMs(), timer);
+        channelsLoader = AsyncLoader.stringLoader(config.getChannelsTimeoutSec(), config.getChannelsTotalTimeoutSec(), config.getChannelsRetryDelayMs(), scheduler);
+        xmltvLoader = AsyncLoader.bytesLoader(config.getXmltvTimeoutSec(), config.getXmltvTotalTimeoutSec(), config.getXmltvRetryDelayMs(), scheduler);
 
         undertow = Undertow.builder()
                 .addHttpListener(config.getPort(), config.getHost())
@@ -112,26 +114,32 @@ public class IptvProxyService implements HttpHandler {
     public void stopService() {
         LOG.info("stopping");
 
-        timer.cancel();
+        try {
+            scheduler.shutdownNow();
+            if (!scheduler.awaitTermination(60, TimeUnit.SECONDS)) {
+                LOG.warn("scheduler is still running...");
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            LOG.error("interrupted while stopping scheduler");
+        }
+
         undertow.stop();
 
         LOG.info("stopped");
     }
 
-    private void scheduleChannelsUpdate(long delay) {
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                new Thread(() -> updateChannels()).start();
-            }
-        }, delay);
+    private void scheduleChannelsUpdate(long delay, TimeUnit timeUnit) {
+        scheduler.schedule(() -> {
+            new Thread(this::updateChannels).start();
+        }, delay, timeUnit);
     }
 
     private void updateChannels() {
         if (updateChannelsImpl()) {
-            scheduleChannelsUpdate(TimeUnit.MINUTES.toMillis(240));
+            scheduleChannelsUpdate(240, TimeUnit.MINUTES);
         } else {
-            scheduleChannelsUpdate(TimeUnit.MINUTES.toMillis(1));
+            scheduleChannelsUpdate(1, TimeUnit.MINUTES);
         }
     }
 
@@ -278,7 +286,7 @@ public class IptvProxyService implements HttpHandler {
 
                     IptvServerChannel serverChannel = serverChannelsByUrl.get(url);
                     if (serverChannel == null) {
-                        serverChannel = new IptvServerChannel(server, url, baseUrl.forPath('/' + id), id, c.getName(), timer);
+                        serverChannel = new IptvServerChannel(server, url, baseUrl.forPath('/' + id), id, c.getName(), scheduler);
                     }
 
                     channel.addServerChannel(serverChannel);
@@ -363,7 +371,7 @@ public class IptvProxyService implements HttpHandler {
             user = user + ':' + proxyUser;
         }
 
-        IptvUser iu = users.computeIfAbsent(user, (u) -> new IptvUser(u, timer, users::remove));
+        IptvUser iu = users.computeIfAbsent(user, (u) -> new IptvUser(u, scheduler, users::remove));
         iu.lock();
         try {
             IptvServerChannel serverChannel = iu.getServerChannel(channel);
