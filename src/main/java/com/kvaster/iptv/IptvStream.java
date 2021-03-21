@@ -77,6 +77,17 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
         }
     }
 
+    private void updateTimeouts() {
+        user.lock();
+        try {
+            user.setExpireTime(System.currentTimeMillis() + userTimeout);
+        } finally {
+            user.unlock();
+        }
+
+        updateReadTimeout();
+    }
+
     @Override
     public void onSubscribe(Subscription subscription) {
         if (this.subscription != null) {
@@ -107,6 +118,10 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
         }
         readMeter.processed(len);
 
+        if (len > 0) {
+            updateTimeouts();
+        }
+
         buffers.addAll(item);
 
         if (busy.compareAndSet(false, true)) {
@@ -128,14 +143,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     }
 
     private boolean sendNext(ByteBuffer b) {
-        user.lock();
-        try {
-            user.setExpireTime(System.currentTimeMillis() + userTimeout);
-        } finally {
-            user.unlock();
-        }
-
-        updateReadTimeout();
+        updateTimeouts();
 
         if (b == END_MARKER) {
             exchange.endExchange();
