@@ -4,11 +4,14 @@ import java.net.HttpURLConnection;
 import java.net.http.HttpResponse;
 
 import io.undertow.server.HttpServerExchange;
+import io.undertow.util.HttpString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HttpUtils {
     private static final Logger LOG = LoggerFactory.getLogger(HttpUtils.class);
+
+    public static HttpString ACCESS_CONTROL = new HttpString("Access-Control-Allow-Origin");
 
     public static boolean isOk(HttpResponse<?> resp, Throwable err, String rid) {
         return isOk(resp, err, null, rid);

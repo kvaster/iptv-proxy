@@ -14,10 +14,14 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -110,19 +114,19 @@ public class IptvServerChannel {
 
     private final Map<String, UserStreams> userStreams = new ConcurrentHashMap<>();
 
-    private static final HttpString[] HEADERS = {
-        Headers.CONTENT_TYPE,
-        Headers.CONTENT_LENGTH,
-        Headers.CONNECTION,
-        Headers.DATE,
-        new HttpString("access-control-allow-origin="),
-        new HttpString("access-control-allow-headers"),
-        new HttpString("access-control-allow-methods"),
-        new HttpString("access-control-expose-headers"),
-        new HttpString("x-memory"),
-        new HttpString("x-route-time"),
-        new HttpString("x-run-time")
-    };
+    private static final Set<String> HEADERS = new HashSet<>(Arrays.asList(
+        "content-type",
+        "content-length",
+        "connection",
+        "date",
+        //"access-control-allow-origin",
+        "access-control-allow-headers",
+        "access-control-allow-methods",
+        "access-control-expose-headers",
+        "x-memory",
+        "x-route-time",
+        "x-run-time"
+    ));
 
     public IptvServerChannel(
             IptvServer server, String channelUrl, BaseUrl baseUrl,
@@ -274,9 +278,13 @@ public class IptvServerChannel {
                     .orTimeout(server.getStreamStartTimeoutSec(), TimeUnit.SECONDS)
                     .whenComplete((resp, err) -> {
                         if (HttpUtils.isOk(resp, err, exchange, rid)) {
-                            for (HttpString header : HEADERS) {
-                                resp.headers().firstValue(header.toString()).ifPresent(value -> exchange.getResponseHeaders().add(header, value));
-                            }
+                            resp.headers().map().forEach((name, values) -> {
+                                if (HEADERS.contains(name.toLowerCase())) {
+                                    exchange.getResponseHeaders().addAll(new HttpString(name), values);
+                                }
+                            });
+
+                            exchange.getResponseHeaders().add(HttpUtils.ACCESS_CONTROL, "*");
 
                             long readTimeoutMs = TimeUnit.SECONDS.toMillis(server.getStreamReadTimeoutSec());
                             resp.body().subscribe(new IptvStream(exchange, rid, user, Math.max(timeout, readTimeoutMs), readTimeoutMs, scheduler));
@@ -312,7 +320,9 @@ public class IptvServerChannel {
                     );
 
                     exchange.setStatusCode(HttpURLConnection.HTTP_OK);
-                    exchange.getResponseHeaders().add(Headers.CONTENT_TYPE, "application/vnd.apple.mpegurl");
+                    exchange.getResponseHeaders()
+                            .add(Headers.CONTENT_TYPE, "application/x-mpegUrl")
+                            .add(HttpUtils.ACCESS_CONTROL, "*");
                     exchange.getResponseSender().send(sb.toString());
                     exchange.endExchange();
                 }

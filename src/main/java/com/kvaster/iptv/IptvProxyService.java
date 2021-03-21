@@ -435,7 +435,8 @@ public class IptvProxyService implements HttpHandler {
 
         exchange.getResponseHeaders()
                 .add(Headers.CONTENT_TYPE, "audio/mpegurl")
-                .add(Headers.CONTENT_DISPOSITION, "attachment; filename=playlist.m3u");
+                .add(Headers.CONTENT_DISPOSITION, "attachment; filename=playlist.m3u")
+                .add(HttpUtils.ACCESS_CONTROL, "*");
 
         List<IptvChannel> chs = new ArrayList<>(channels.values());
         chs.sort(Comparator.comparing(IptvChannel::getName));
