@@ -23,7 +23,6 @@ public class IptvServer {
 
         httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.ALWAYS)
-                .connectTimeout(Duration.ofSeconds(sc.getConnectTimeoutSec()))
                 .build();
     }
 
@@ -73,10 +72,6 @@ public class IptvServer {
 
     public long getCatchupRetryDelayMs() {
         return sc.getCatchupRetryDelayMs();
-    }
-
-    public long getConnectTimeoutSec() {
-        return sc.getConnectTimeoutSec();
     }
 
     public long getStreamStartTimeoutSec() {

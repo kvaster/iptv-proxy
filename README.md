@@ -42,7 +42,6 @@ servers:
     catchup_timeout_sec: 5
     catchup_total_timeout_sec: 10
     catchup_retry_delay_ms: 500
-    connect_timeout_sec: 2
     stream_start_timeout_sec: 2
     stream_read_timeout_sec: 2
 allow_anonymous: false
@@ -75,7 +74,6 @@ will trigger automatic request retry. We'll be trying to make additional request
 * `catchup_timeout_sec` - same as `info_timeout_sec` but used only with catchup (channel archive, timeshift, default is 5 sec).
 * `catchup_total_timeout_sec` - same as `info_total_timeout_sec` but used only with catchup (default is 10 sec).
 * `catchup_retry_delay_ms` - same as `info_retry_delay_ms` but used only with catchup (default is 500ms).
-* `connect_timeout_sec` - connect timeout for all type of connections (default is 2 sec).
 * `stream_start_timeout_sec` - timeout for starting actually streaming data (default is 2 sec)
 * `stream_read_timeout_sec` - read timeout during streaming - time between any data packets (default is 2 sec) 
 * `allow_anonymous` - allow to connect any device without specific user name.

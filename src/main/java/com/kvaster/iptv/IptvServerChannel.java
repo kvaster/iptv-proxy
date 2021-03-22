@@ -10,7 +10,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -19,7 +18,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -182,13 +180,9 @@ public class IptvServerChannel {
         userStreams.remove(userId);
     }
 
-    private HttpRequest.Builder createRequest(String url, IptvUser user, long timeoutSec) {
+    private HttpRequest.Builder createRequest(String url, IptvUser user) {
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url));
-
-        if (timeoutSec > 0) {
-            builder.timeout(Duration.ofSeconds(timeoutSec));
-        }
 
         // send user id to next iptv-proxy
         if (server.getSendUser()) {
@@ -267,11 +261,10 @@ public class IptvServerChannel {
         }
 
         // be sure we have time to start stream
-        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getConnectTimeoutSec()));
+        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getStreamStartTimeoutSec()) + 100);
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-            // we should not limit overall time of stream connection
-            HttpRequest req = createRequest(url, user, 0).build();
+            HttpRequest req = createRequest(url, user).build();
 
             // configure buffering according to undertow buffers settings for best performance
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
@@ -361,11 +354,12 @@ public class IptvServerChannel {
     }
 
     private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user, UserStreams us) {
-        HttpRequest req = createRequest(us.channelUrl, user, us.isCatchup ? server.getCatchupTimeoutSec() : server.getInfoTimeoutSec()).build();
+        HttpRequest req = createRequest(us.channelUrl, user).build();
 
         LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, us.channelUrl, retryNo);
 
         httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .orTimeout(us.isCatchup ? server.getCatchupTimeoutSec() : server.getInfoTimeoutSec(), TimeUnit.SECONDS)
                 .whenComplete((resp, err) -> {
                     if (HttpUtils.isOk(resp, err, rid)) {
                         String[] info = resp.body().split("\n");

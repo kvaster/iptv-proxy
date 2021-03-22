@@ -15,7 +15,6 @@ public class IptvServerConfig {
     private long catchupTimeoutSec = 5;
     private long catchupTotalTimeoutSec = 10;
     private long catchupRetryDelayMs = 500;
-    private long connectTimeoutSec = 2;
     private long streamStartTimeoutSec = 2;
     private long streamReadTimeoutSec = 2;
 
@@ -89,10 +88,6 @@ public class IptvServerConfig {
 
     public long getCatchupRetryDelayMs() {
         return catchupRetryDelayMs;
-    }
-
-    public long getConnectTimeoutSec() {
-        return connectTimeoutSec;
     }
 
     public long getStreamStartTimeoutSec() {

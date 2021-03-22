@@ -4,7 +4,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -62,10 +61,10 @@ public class AsyncLoader<T> {
 
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(timeoutSec))
                 .build();
 
         httpClient.sendAsync(req, handlerSupplier.get())
+                .orTimeout(timeoutSec, TimeUnit.SECONDS)
                 .whenComplete((resp, err) -> {
                     if (HttpUtils.isOk(resp, err, rid)) {
                         future.complete(resp.body());
