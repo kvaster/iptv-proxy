@@ -37,11 +37,11 @@ servers:
     proxy_stream: true
     channel_failed_ms: 1000
     info_timeout_sec: 2
-    info_total_timeout_sec: 3
-    info_retry_delay_ms: 500
+    info_total_timeout_sec: 5
+    info_retry_delay_ms: 100
     catchup_timeout_sec: 5
     catchup_total_timeout_sec: 10
-    catchup_retry_delay_ms: 500
+    catchup_retry_delay_ms: 100
     stream_start_timeout_sec: 2
     stream_read_timeout_sec: 2
 allow_anonymous: false
@@ -69,11 +69,11 @@ This feature should be enabled for last iptvproxy in chain (the one which connec
 and should be disabled in other situation
 * `info_timeout_sec` - timeout for single request (default is 2 sec)
 * `info_total_timeout_sec` - some providers may return 404 http error on m3u8 request. This setting
-will trigger automatic request retry. We'll be trying to make additional requests for this period. (default is 3 sec).
-* `info_retry_delay_ms` - delay in milliseconds between retries (default is 500 ms).
+will trigger automatic request retry. We'll be trying to make additional requests for this period. (default is 5 sec).
+* `info_retry_delay_ms` - delay in milliseconds between retries (default is 100 ms).
 * `catchup_timeout_sec` - same as `info_timeout_sec` but used only with catchup (channel archive, timeshift, default is 5 sec).
 * `catchup_total_timeout_sec` - same as `info_total_timeout_sec` but used only with catchup (default is 10 sec).
-* `catchup_retry_delay_ms` - same as `info_retry_delay_ms` but used only with catchup (default is 500ms).
+* `catchup_retry_delay_ms` - same as `info_retry_delay_ms` but used only with catchup (default is 100ms).
 * `stream_start_timeout_sec` - timeout for starting actually streaming data (default is 2 sec)
 * `stream_read_timeout_sec` - read timeout during streaming - time between any data packets (default is 2 sec) 
 * `allow_anonymous` - allow to connect any device without specific user name.

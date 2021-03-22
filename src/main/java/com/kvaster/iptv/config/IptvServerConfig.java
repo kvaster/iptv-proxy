@@ -10,11 +10,11 @@ public class IptvServerConfig {
     private boolean proxyStream = true;
     private long channelFailedMs;
     private long infoTimeoutSec = 2;
-    private long infoTotalTimeoutSec = 3;
-    private long infoRetryDelayMs = 500;
+    private long infoTotalTimeoutSec = 5;
+    private long infoRetryDelayMs = 100;
     private long catchupTimeoutSec = 5;
     private long catchupTotalTimeoutSec = 10;
-    private long catchupRetryDelayMs = 500;
+    private long catchupRetryDelayMs = 100;
     private long streamStartTimeoutSec = 2;
     private long streamReadTimeoutSec = 2;
 
