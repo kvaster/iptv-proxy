@@ -50,6 +50,14 @@ public class IptvServer {
         return sc.getSendUser();
     }
 
+    public boolean getSortChannels() {
+        return sc.getSortChannels();
+    }
+
+    public String getChannelPrefix() {
+        return sc.getChannelPrefix();
+    }
+
     public boolean getProxyStream() {
         return sc.getProxyStream();
     }

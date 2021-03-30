@@ -7,6 +7,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,8 +63,10 @@ public class IptvProxyService implements HttpHandler {
     private final AtomicLong idCounter = new AtomicLong(System.currentTimeMillis());
 
     private final List<IptvServerGroup> serverGroups = new ArrayList<>();
-    private volatile Map<String, IptvChannel> channels = new HashMap<>();
+    private volatile Map<String, IptvChannel> channels = new LinkedHashMap<>();
     private Map<String, IptvServerChannel> serverChannelsByUrl = new HashMap<>();
+
+    private boolean sortChannels;
 
     private final Map<String, IptvUser> users = new ConcurrentHashMap<>();
 
@@ -85,6 +88,8 @@ public class IptvProxyService implements HttpHandler {
 
         this.allowAnonymous = config.getAllowAnonymous();
         this.allowedUsers = config.getUsers();
+
+        this.sortChannels = config.getSortChannels();
 
         channelsLoader = AsyncLoader.stringLoader(config.getChannelsTimeoutSec(), config.getChannelsTotalTimeoutSec(), config.getChannelsRetryDelayMs(), scheduler);
         xmltvLoader = AsyncLoader.bytesLoader(config.getXmltvTimeoutSec(), config.getXmltvTotalTimeoutSec(), config.getXmltvRetryDelayMs(), scheduler);
@@ -144,7 +149,7 @@ public class IptvProxyService implements HttpHandler {
     private boolean updateChannelsImpl() {
         LOG.info("updating channels");
 
-        Map<String, IptvChannel> chs = new HashMap<>();
+        Map<String, IptvChannel> chs = new LinkedHashMap<>();
         Map<String, IptvServerChannel> byUrl = new HashMap<>();
 
         Digest digest = Digest.sha256();
@@ -226,6 +231,7 @@ public class IptvProxyService implements HttpHandler {
                     return false;
                 }
 
+                List<IptvChannel> sChs = new ArrayList<>();
                 m3u.getChannels().forEach((c) -> {
                     // Unique ID will be formed from server name and channel name.
                     // It seems that there will be no any other suitable way to identify channel.
@@ -278,8 +284,11 @@ public class IptvProxyService implements HttpHandler {
                             xmltvId = newId;
                         }
 
-                        channel = new IptvChannel(id, c.getName(), logo, c.getGroups(), xmltvId, days);
-                        chs.put(id, channel);
+                        final String label = server.getChannelPrefix() != null
+                                ? server.getChannelPrefix() + c.getName()
+                                : c.getName();
+                        channel = new IptvChannel(id, c.getName(), label, logo, c.getGroups(), xmltvId, days);
+                        sChs.add(channel);
                     }
 
                     IptvServerChannel serverChannel = serverChannelsByUrl.get(url);
@@ -289,9 +298,13 @@ public class IptvProxyService implements HttpHandler {
 
                     channel.addServerChannel(serverChannel);
 
-                    chs.put(id, channel);
+                    sChs.add(channel);
                     byUrl.put(url, serverChannel);
                 });
+                if (server.getSortChannels()) {
+                    sChs.sort(Comparator.comparing(IptvChannel::getName));
+                }
+                sChs.forEach(ch -> chs.put(ch.getId(), ch));
             }
 
             if (xmltv != null) {
@@ -439,7 +452,9 @@ public class IptvProxyService implements HttpHandler {
                 .add(HttpUtils.ACCESS_CONTROL, "*");
 
         List<IptvChannel> chs = new ArrayList<>(channels.values());
-        chs.sort(Comparator.comparing(IptvChannel::getName));
+        if (sortChannels) {
+            chs.sort(Comparator.comparing(IptvChannel::getName));
+        }
 
         StringBuilder sb = new StringBuilder();
         sb.append("#EXTM3U\n");
@@ -459,7 +474,7 @@ public class IptvProxyService implements HttpHandler {
                 sb.append(" catchup=\"shift\" catchup-days=\"").append(ch.getCatchupDays()).append('"');
             }
 
-            sb.append(',').append(ch.getName()).append("\n");
+            sb.append(',').append(ch.getLabel()).append("\n");
 
             if (ch.getGroups().size() > 0) {
                 sb.append("#EXTGRP:").append(String.join(";", ch.getGroups())).append("\n");

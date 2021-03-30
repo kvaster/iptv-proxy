@@ -45,6 +45,7 @@ servers:
     stream_start_timeout_sec: 2
     stream_read_timeout_sec: 2
 allow_anonymous: false
+sort_channels: true
 users:
   - 65182_login1
   - 97897_login2
@@ -75,7 +76,10 @@ will trigger automatic request retry. We'll be trying to make additional request
 * `catchup_total_timeout_sec` - same as `info_total_timeout_sec` but used only with catchup (default is 10 sec).
 * `catchup_retry_delay_ms` - same as `info_retry_delay_ms` but used only with catchup (default is 100ms).
 * `stream_start_timeout_sec` - timeout for starting actually streaming data (default is 2 sec)
-* `stream_read_timeout_sec` - read timeout during streaming - time between any data packets (default is 2 sec) 
+* `stream_read_timeout_sec` - read timeout during streaming - time between any data packets (default is 2 sec)
+* `sort_channels` - if specified per server than allows to sort channels inside of particular playlist provider only.
+Otherwise performs alphabetical sorting of final (joined) playlist.
+* `channel_prefix` - if specified per server then all channels from this server get prefix in its name. However prefix doesn't affect sorting.
 * `allow_anonymous` - allow to connect any device without specific user name.
 It is not good idea to use such setup. You really should add name for each device you're using.
 
