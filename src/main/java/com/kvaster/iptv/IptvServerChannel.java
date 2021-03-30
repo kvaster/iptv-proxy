@@ -189,6 +189,10 @@ public class IptvServerChannel {
             builder.header(IptvServer.PROXY_USER_HEADER, user.getId());
         }
 
+        if (server.getServerUser() != null) {
+            HttpUtils.addBase64Authorization(builder, server.getServerUser(), server.getServerPassword());
+        }
+
         return builder;
     }
 

@@ -154,9 +154,9 @@ public class IptvProxyService implements HttpHandler {
         Map<IptvServerGroup, CompletableFuture<byte[]>> xmltvLoads = new HashMap<>();
         serverGroups.forEach((sg) -> {
             if (sg.xmltvUrl != null) {
-                xmltvLoads.put(sg, xmltvLoader.loadAsync("xmltv: " + sg.name, sg.xmltvUrl, defaultHttpClient));
+                xmltvLoads.put(sg, xmltvLoader.loadAsync("xmltv: " + sg.name, sg.xmltvUrl, null, null, defaultHttpClient));
             }
-            sg.servers.forEach(s -> loads.put(s, channelsLoader.loadAsync("playlist: " + s.getName(), s.getUrl(), s.getHttpClient())));
+            sg.servers.forEach(s -> loads.put(s, channelsLoader.loadAsync("playlist: " + s.getName(), s.getUrl(), s.getServerUser(), s.getServerPassword(), s.getHttpClient())));
         });
 
         XmltvDoc newXmltv = new XmltvDoc()

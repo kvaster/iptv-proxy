@@ -1,7 +1,10 @@
 package com.kvaster.iptv;
 
 import java.net.HttpURLConnection;
+import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HttpString;
@@ -37,5 +40,13 @@ public class HttpUtils {
         }
 
         return true;
+    }
+
+    public static void addBase64Authorization(HttpRequest.Builder reqBuilder, String user, String password) {
+        String auth = user + ":" + password;
+        byte[] encodedAuth = Base64.getEncoder().encode(
+                auth.getBytes(StandardCharsets.ISO_8859_1));
+        String authHeader = "Basic " + new String(encodedAuth);
+        reqBuilder.header("Authorization", authHeader);
     }
 }
