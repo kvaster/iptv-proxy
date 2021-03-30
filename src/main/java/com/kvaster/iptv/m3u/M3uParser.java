@@ -96,8 +96,14 @@ public class M3uParser {
                 props.put(m.group(1), m.group(2));
                 line = m.group(3).strip();
             } else {
-                LOG.warn("malformed properties: {}", line);
-                break;
+                if (line.contains(" ")) {
+                    String mailformedPart = line.substring(0, line.indexOf(" "));
+                    line = line.substring(line.indexOf(" ") + 1);
+                    LOG.warn("malformed properties: {}", mailformedPart);
+                } else {
+                    LOG.warn("malformed properties: {}", line);
+                    break;
+                }
             }
         }
 

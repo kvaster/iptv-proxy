@@ -40,17 +40,19 @@ public class AsyncLoader<T> {
         this.handlerSupplier = handlerSupplier;
     }
 
-    public CompletableFuture<T> loadAsync(String msg, String url, HttpClient httpClient) {
+    public CompletableFuture<T> loadAsync(String msg, String url, String user, String password, HttpClient httpClient) {
         final String rid = RequestCounter.next();
 
         var future = new CompletableFuture<T>();
-        loadAsync(msg, url, 0, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(totalTimeoutSec), rid, future, httpClient);
+        loadAsync(msg, url, user, password, 0, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(totalTimeoutSec), rid, future, httpClient);
         return future;
     }
 
     private void loadAsync(
             String msg,
             String url,
+            String user,
+            String password,
             int retryNo,
             long expireTime,
             String rid,
@@ -59,9 +61,16 @@ public class AsyncLoader<T> {
     ) {
         LOG.info("{}loading {}, retry: {}, url: {}", rid, msg, retryNo, url);
 
-        HttpRequest req = HttpRequest.newBuilder()
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder();
+        reqBuilder
                 .uri(URI.create(url))
                 .build();
+
+        if (user != null) {
+            HttpUtils.addBase64Authorization(reqBuilder, user, password);
+        }
+
+        HttpRequest req = reqBuilder.build();
 
         httpClient.sendAsync(req, handlerSupplier.get())
                 .orTimeout(timeoutSec, TimeUnit.SECONDS)
@@ -73,7 +82,7 @@ public class AsyncLoader<T> {
                             LOG.warn("{}will retry", rid);
 
                             scheduler.schedule(
-                                    () -> loadAsync(msg, url, retryNo + 1, expireTime, rid, future, httpClient),
+                                    () -> loadAsync(msg, url, user, password, retryNo + 1, expireTime, rid, future, httpClient),
                                     retryDelayMs,
                                     TimeUnit.MILLISECONDS
                             );

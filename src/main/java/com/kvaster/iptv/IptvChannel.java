@@ -16,23 +16,27 @@ public class IptvChannel {
 
     private final String id;
     private final String name;
+    private final String label;
 
     private final String logo;
     private final Set<String> groups;
     private final String xmltvId;
+    private final String catchup;
     private final int catchupDays;
 
     private final Random rand = new Random();
 
     private final List<IptvServerChannel> serverChannels = new ArrayList<>();
 
-    public IptvChannel(String id, String name, String logo, Collection<String> groups, String xmltvId, int catchupDays) {
+    public IptvChannel(String id, String name, String label, String logo, Collection<String> groups, String xmltvId, String catchup, int catchupDays) {
         this.id = id;
         this.name = name;
+        this.label = label;
 
         this.logo = logo;
         this.groups = Collections.unmodifiableSet(new TreeSet<>(groups));
         this.xmltvId = xmltvId;
+        this.catchup = catchup;
         this.catchupDays = catchupDays;
     }
 
@@ -42,6 +46,10 @@ public class IptvChannel {
 
     public String getName() {
         return name;
+    }
+
+    public String getLabel() {
+        return label;
     }
 
     public String getLogo() {
@@ -54,6 +62,10 @@ public class IptvChannel {
 
     public String getXmltvId() {
         return xmltvId;
+    }
+
+    public String getCatchup() {
+        return catchup;
     }
 
     public int getCatchupDays() {

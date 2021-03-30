@@ -6,6 +6,8 @@ public class IptvServerConfig {
     private String name;
     private List<IptvConnectionConfig> connections;
     private String xmltvUrl;
+    private boolean sortChannels;
+    private String channelPrefix;
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
@@ -26,6 +28,8 @@ public class IptvServerConfig {
             String name,
             List<IptvConnectionConfig> connections,
             String xmltvUrl,
+            boolean sortChannels,
+            String channelPrefix,
             boolean sendUser,
             boolean proxyStream,
             long channelFailedMs,
@@ -35,6 +39,8 @@ public class IptvServerConfig {
         this.name = name;
         this.connections = connections;
         this.xmltvUrl = xmltvUrl;
+        this.sortChannels = sortChannels;
+        this.channelPrefix = channelPrefix;
         this.sendUser = sendUser;
         this.proxyStream = proxyStream;
         this.channelFailedMs = channelFailedMs;
@@ -96,5 +102,13 @@ public class IptvServerConfig {
 
     public long getStreamReadTimeoutSec() {
         return streamReadTimeoutSec;
+    }
+
+    public boolean getSortChannels() {
+        return sortChannels;
+    }
+
+    public String getChannelPrefix() {
+        return channelPrefix;
     }
 }

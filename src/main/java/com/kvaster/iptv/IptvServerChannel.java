@@ -189,6 +189,10 @@ public class IptvServerChannel {
             builder.header(IptvServer.PROXY_USER_HEADER, user.getId());
         }
 
+        if (server.getServerUser() != null) {
+            HttpUtils.addBase64Authorization(builder, server.getServerUser(), server.getServerPassword());
+        }
+
         return builder;
     }
 
@@ -501,7 +505,8 @@ public class IptvServerChannel {
         UserStreams us = userStreams.get(user.getId());
         if (us == null || !us.channelUrl.equals(url)) {
             boolean isCatchup = exchange.getQueryParameters().containsKey("utc") ||
-                    exchange.getQueryParameters().containsKey("lutc");
+                    exchange.getQueryParameters().containsKey("lutc") ||
+                    exchange.getQueryParameters().containsKey("timeshift");
             us = new UserStreams(isCatchup ? defaultCatchupTimeout : defaultInfoTimeout, url);
             us.isCatchup = isCatchup;
             userStreams.put(user.getId(), us);

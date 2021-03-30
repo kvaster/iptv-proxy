@@ -13,6 +13,7 @@ public class IptvProxyConfig {
     private String tokenSalt;
     private List<IptvServerConfig> servers;
     private boolean allowAnonymous = true;
+    private boolean sortChannels = true;
     private Set<String> users = new HashSet<>();
     private long channelsTimeoutSec = 5;
     private long channelsTotalTimeoutSec = 60;
@@ -28,7 +29,7 @@ public class IptvProxyConfig {
     public IptvProxyConfig(
             String host, int port, String baseUrl, String forwardedPass,
             String tokenSalt, List<IptvServerConfig> servers,
-            boolean allowAnonymous, Set<String> users,
+            boolean allowAnonymous, boolean sortChannels, Set<String> users,
             int channelsTimeoutSec, int channelsTotalTimeoutSec, long channelsRetryDelayMs
     ) {
         this.host = host;
@@ -38,6 +39,7 @@ public class IptvProxyConfig {
         this.tokenSalt = tokenSalt;
         this.servers = new ArrayList<>(servers);
         this.allowAnonymous = allowAnonymous;
+        this.sortChannels = sortChannels;
         this.users = new HashSet<>(users);
         this.channelsTimeoutSec = channelsTimeoutSec;
         this.channelsTotalTimeoutSec = channelsTotalTimeoutSec;
@@ -98,5 +100,9 @@ public class IptvProxyConfig {
 
     public long getXmltvRetryDelayMs() {
         return xmltvRetryDelayMs;
+    }
+
+    public boolean getSortChannels() {
+        return sortChannels;
     }
 }
