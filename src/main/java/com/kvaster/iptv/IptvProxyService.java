@@ -262,6 +262,14 @@ public class IptvProxyService implements HttpHandler {
                             logo = xmltvCh.getIcon().getSrc();
                         }
 
+                        String catchup = c.getProp("catchup");
+                        if (catchup == null) {
+                            catchup = c.getProp("catchup-type");
+                        }
+                        if (catchup == null) {
+                            catchup = "shift";
+                        }
+
                         int days = 0;
                         String daysStr = c.getProp("tvg-rec");
                         if (daysStr == null) {
@@ -272,6 +280,13 @@ public class IptvProxyService implements HttpHandler {
                                 days = Integer.parseInt(daysStr);
                             } catch (NumberFormatException e) {
                                 LOG.warn("error parsing catchup days: {}, channel: {}", daysStr, c.getName());
+                            }
+                        } else if (c.getProp("catchup-time") != null){
+                            try {
+                                int seconds = Integer.parseInt(c.getProp("catchup-time"));
+                                days = seconds / 3600 / 24;
+                            } catch (NumberFormatException e) {
+                                LOG.warn("error parsing catchup seconds: {}, channel: {}", daysStr, c.getName());
                             }
                         }
 
@@ -287,7 +302,7 @@ public class IptvProxyService implements HttpHandler {
                         final String label = server.getChannelPrefix() != null
                                 ? server.getChannelPrefix() + c.getName()
                                 : c.getName();
-                        channel = new IptvChannel(id, c.getName(), label, logo, c.getGroups(), xmltvId, days);
+                        channel = new IptvChannel(id, c.getName(), label, logo, c.getGroups(), xmltvId, catchup, days);
                         sChs.add(channel);
                     }
 
@@ -471,7 +486,7 @@ public class IptvProxyService implements HttpHandler {
             }
 
             if (ch.getCatchupDays() != 0) {
-                sb.append(" catchup=\"shift\" catchup-days=\"").append(ch.getCatchupDays()).append('"');
+                sb.append(" catchup=\"").append(ch.getCatchup()).append("\"  catchup-days=\"").append(ch.getCatchupDays()).append('"');
             }
 
             sb.append(',').append(ch.getLabel()).append("\n");
