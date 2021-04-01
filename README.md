@@ -32,6 +32,8 @@ servers:
         max_connections: 4
       - url: https://iptv-proxy.example.com/playlist2.m3u
         max_connections: 2
+        login: mylogin
+        password: mypassword
     xmltv_url: https://epg.example.com/epg.xml.gz
     send_user: true
     proxy_stream: true
@@ -57,6 +59,9 @@ users:
 * `channels_total_timeout_sec` - total timeout for channels loading (default is 60 sec)
 * `channels_retry_delay_ms` - delay between requests (default is 1000 ms)
 * `max_connections` - max active connections allowed for this playlist
+* `login` - login for basic authentication (useful for tvheadend iptv playlists)
+* `password` - password for basic authentication (useful for tvheadend iptv playlists)
+* `xmltv_url` - url for xmltv data, epg for different servers will be reprocessed and combined to one file for all channels
 * `send_user` - this is useful only when you're using cascade config - iptv-proxy behind iptv-proxy.
 If 'true' then iptv-proxy will send current user name in special http header.
 We need this to identify device (endpoint) - this will help us to handle max connections and

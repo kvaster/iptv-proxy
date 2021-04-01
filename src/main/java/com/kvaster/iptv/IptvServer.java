@@ -1,7 +1,9 @@
 package com.kvaster.iptv;
 
+import java.net.URI;
 import java.net.http.HttpClient;
-import java.time.Duration;
+import java.net.http.HttpRequest;
+import java.util.Base64;
 import java.util.Objects;
 
 import com.kvaster.iptv.config.IptvConnectionConfig;
@@ -95,5 +97,17 @@ public class IptvServer {
         if (acquired > 0) {
             acquired--;
         }
+    }
+
+    public HttpRequest.Builder createRequest(String url) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url));
+
+        // add basic authentication
+        if (cc.getLogin() != null && cc.getPassword() != null) {
+            builder.header("Authorization", "Basic " + Base64.getEncoder().encodeToString((cc.getLogin() + ":" + cc.getPassword()).getBytes()));
+        }
+
+        return builder;
     }
 }

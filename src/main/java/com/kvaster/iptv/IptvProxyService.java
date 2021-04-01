@@ -156,7 +156,7 @@ public class IptvProxyService implements HttpHandler {
             if (sg.xmltvUrl != null) {
                 xmltvLoads.put(sg, xmltvLoader.loadAsync("xmltv: " + sg.name, sg.xmltvUrl, defaultHttpClient));
             }
-            sg.servers.forEach(s -> loads.put(s, channelsLoader.loadAsync("playlist: " + s.getName(), s.getUrl(), s.getHttpClient())));
+            sg.servers.forEach(s -> loads.put(s, channelsLoader.loadAsync("playlist: " + s.getName(), s.createRequest(s.getUrl()).build(), s.getHttpClient())));
         });
 
         XmltvDoc newXmltv = new XmltvDoc()

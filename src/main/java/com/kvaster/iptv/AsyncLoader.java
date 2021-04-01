@@ -41,27 +41,27 @@ public class AsyncLoader<T> {
     }
 
     public CompletableFuture<T> loadAsync(String msg, String url, HttpClient httpClient) {
+        return loadAsync(msg, HttpRequest.newBuilder().uri(URI.create(url)).build(), httpClient);
+    }
+
+    public CompletableFuture<T> loadAsync(String msg, HttpRequest req, HttpClient httpClient) {
         final String rid = RequestCounter.next();
 
         var future = new CompletableFuture<T>();
-        loadAsync(msg, url, 0, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(totalTimeoutSec), rid, future, httpClient);
+        loadAsync(msg, req, 0, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(totalTimeoutSec), rid, future, httpClient);
         return future;
     }
 
     private void loadAsync(
             String msg,
-            String url,
+            HttpRequest req,
             int retryNo,
             long expireTime,
             String rid,
             CompletableFuture<T> future,
             HttpClient httpClient
     ) {
-        LOG.info("{}loading {}, retry: {}, url: {}", rid, msg, retryNo, url);
-
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .build();
+        LOG.info("{}loading {}, retry: {}, url: {}", rid, msg, retryNo, req.uri());
 
         httpClient.sendAsync(req, handlerSupplier.get())
                 .orTimeout(timeoutSec, TimeUnit.SECONDS)
@@ -73,7 +73,7 @@ public class AsyncLoader<T> {
                             LOG.warn("{}will retry", rid);
 
                             scheduler.schedule(
-                                    () -> loadAsync(msg, url, retryNo + 1, expireTime, rid, future, httpClient),
+                                    () -> loadAsync(msg, req, retryNo + 1, expireTime, rid, future, httpClient),
                                     retryDelayMs,
                                     TimeUnit.MILLISECONDS
                             );

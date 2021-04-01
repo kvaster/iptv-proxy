@@ -180,16 +180,15 @@ public class IptvServerChannel {
         userStreams.remove(userId);
     }
 
-    private HttpRequest.Builder createRequest(String url, IptvUser user) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(url));
+    private HttpRequest createRequest(String url, IptvUser user) {
+        HttpRequest.Builder builder = server.createRequest(url);
 
         // send user id to next iptv-proxy
-        if (server.getSendUser()) {
+        if (user != null && server.getSendUser()) {
             builder.header(IptvServer.PROXY_USER_HEADER, user.getId());
         }
 
-        return builder;
+        return builder.build();
     }
 
     private long calculateTimeout(long duration) {
@@ -264,10 +263,8 @@ public class IptvServerChannel {
         user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getStreamStartTimeoutSec()) + 100);
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-            HttpRequest req = createRequest(url, user).build();
-
             // configure buffering according to undertow buffers settings for best performance
-            httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
+            httpClient.sendAsync(createRequest(url, user), HttpResponse.BodyHandlers.ofPublisher())
                     .orTimeout(server.getStreamStartTimeoutSec(), TimeUnit.SECONDS)
                     .whenComplete((resp, err) -> {
                         if (HttpUtils.isOk(resp, err, exchange, rid)) {
@@ -354,11 +351,9 @@ public class IptvServerChannel {
     }
 
     private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user, UserStreams us) {
-        HttpRequest req = createRequest(us.channelUrl, user).build();
-
         LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, us.channelUrl, retryNo);
 
-        httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+        httpClient.sendAsync(createRequest(us.channelUrl, user), HttpResponse.BodyHandlers.ofString())
                 .orTimeout(us.isCatchup ? server.getCatchupTimeoutSec() : server.getInfoTimeoutSec(), TimeUnit.SECONDS)
                 .whenComplete((resp, err) -> {
                     if (HttpUtils.isOk(resp, err, rid)) {
