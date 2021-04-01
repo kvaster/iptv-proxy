@@ -19,13 +19,10 @@ public class IptvServer {
 
     private int acquired;
 
-    public IptvServer(IptvServerConfig sc, IptvConnectionConfig cc) {
+    public IptvServer(IptvServerConfig sc, IptvConnectionConfig cc, HttpClient httpClient) {
         this.sc = Objects.requireNonNull(sc);
         this.cc = Objects.requireNonNull(cc);
-
-        httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.ALWAYS)
-                .build();
+        this.httpClient = Objects.requireNonNull(httpClient);
     }
 
     public HttpClient getHttpClient() {

@@ -97,7 +97,7 @@ public class IptvProxyService implements HttpHandler {
         config.getServers().forEach((sc) -> {
             IptvServerGroup sg = new IptvServerGroup(sc.getName(), sc.getXmltvUrl());
             serverGroups.add(sg);
-            sc.getConnections().forEach((cc) -> sg.servers.add(new IptvServer(sc, cc)));
+            sc.getConnections().forEach((cc) -> sg.servers.add(new IptvServer(sc, cc, defaultHttpClient)));
         });
     }
 
