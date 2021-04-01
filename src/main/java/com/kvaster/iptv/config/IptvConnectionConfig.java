@@ -7,12 +7,6 @@ public class IptvConnectionConfig {
     private String password;
 
     protected IptvConnectionConfig() {
-        // for deserialization
-    }
-
-    public IptvConnectionConfig(String url, int maxConnections) {
-        this.url = url;
-        this.maxConnections = maxConnections;
     }
 
     public String getUrl() {
@@ -29,5 +23,33 @@ public class IptvConnectionConfig {
 
     public String getPassword() {
         return password;
+    }
+
+    public static class Builder {
+        private final IptvConnectionConfig c = new IptvConnectionConfig();
+
+        public IptvConnectionConfig build() {
+            return c;
+        }
+
+        public Builder url(String url) {
+            c.url = url;
+            return this;
+        }
+
+        public Builder maxConnections(int maxConnections) {
+            c.maxConnections = maxConnections;
+            return this;
+        }
+
+        public Builder login(String login) {
+            c.login = login;
+            return this;
+        }
+
+        public Builder password(String password) {
+            c.password = password;
+            return this;
+        }
     }
 }

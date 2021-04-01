@@ -1,6 +1,7 @@
 package com.kvaster.iptv.config;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,26 +23,6 @@ public class IptvProxyConfig {
     private long xmltvRetryDelayMs = 1000;
 
     protected IptvProxyConfig() {
-        // for deserialization
-    }
-
-    public IptvProxyConfig(
-            String host, int port, String baseUrl, String forwardedPass,
-            String tokenSalt, List<IptvServerConfig> servers,
-            boolean allowAnonymous, Set<String> users,
-            int channelsTimeoutSec, int channelsTotalTimeoutSec, long channelsRetryDelayMs
-    ) {
-        this.host = host;
-        this.port = port;
-        this.baseUrl = baseUrl;
-        this.forwardedPass = forwardedPass;
-        this.tokenSalt = tokenSalt;
-        this.servers = new ArrayList<>(servers);
-        this.allowAnonymous = allowAnonymous;
-        this.users = new HashSet<>(users);
-        this.channelsTimeoutSec = channelsTimeoutSec;
-        this.channelsTotalTimeoutSec = channelsTotalTimeoutSec;
-        this.channelsRetryDelayMs = channelsRetryDelayMs;
     }
 
     public String getHost() {
@@ -98,5 +79,87 @@ public class IptvProxyConfig {
 
     public long getXmltvRetryDelayMs() {
         return xmltvRetryDelayMs;
+    }
+
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final IptvProxyConfig c = new IptvProxyConfig();
+
+        public IptvProxyConfig build() {
+            return c;
+        }
+
+        public Builder host(String host) {
+            c.host = host;
+            return this;
+        }
+
+        public Builder port(int port) {
+            c.port = port;
+            return this;
+        }
+
+        public Builder baseUrl(String baseUrl) {
+            c.baseUrl = baseUrl;
+            return this;
+        }
+
+        public Builder forwardedPass(String forwardedPass) {
+            c.forwardedPass = forwardedPass;
+            return this;
+        }
+
+        public Builder tokenSalt(String tokenSalt) {
+            c.tokenSalt = tokenSalt;
+            return this;
+        }
+
+        public Builder servers(Collection<IptvServerConfig> servers) {
+            c.servers = new ArrayList<>(servers);
+            return this;
+        }
+
+        public Builder allowAnonymous(boolean allowAnonymous) {
+            c.allowAnonymous = allowAnonymous;
+            return this;
+        }
+
+        public Builder users(Collection<String> users) {
+            c.users = new HashSet<>(users);
+            return this;
+        }
+
+        public Builder channelsTimeoutSec(long channelsTimeoutSec) {
+            c.channelsTimeoutSec = channelsTimeoutSec;
+            return this;
+        }
+
+        public Builder channelsTotalTimeoutSec(long channelsTotalTimeoutSec) {
+            c.channelsTotalTimeoutSec = channelsTotalTimeoutSec;
+            return this;
+        }
+
+        public Builder channelsRetryDelayMs(long channelsRetryDelayMs) {
+            c.channelsRetryDelayMs = channelsRetryDelayMs;
+            return this;
+        }
+
+        public Builder xmltvTimeoutSec(long xmltvTimeoutSec) {
+            c.xmltvTimeoutSec = xmltvTimeoutSec;
+            return this;
+        }
+
+        public Builder xmltvTotalTimeoutSec(long xmltvTotalTimeoutSec) {
+            c.xmltvTotalTimeoutSec = xmltvTotalTimeoutSec;
+            return this;
+        }
+
+        public Builder xmltvRetryDelayMs(long xmltvRetryDelayMs) {
+            c.xmltvRetryDelayMs = xmltvRetryDelayMs;
+            return this;
+        }
     }
 }

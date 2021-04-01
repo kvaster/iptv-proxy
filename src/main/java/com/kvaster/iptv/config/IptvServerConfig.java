@@ -1,5 +1,7 @@
 package com.kvaster.iptv.config;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class IptvServerConfig {
@@ -18,28 +20,7 @@ public class IptvServerConfig {
     private long streamStartTimeoutSec = 2;
     private long streamReadTimeoutSec = 2;
 
-    protected IptvServerConfig() {
-        // for deserialization
-    }
-
-    public IptvServerConfig(
-            String name,
-            List<IptvConnectionConfig> connections,
-            String xmltvUrl,
-            boolean sendUser,
-            boolean proxyStream,
-            long channelFailedMs,
-            long infoTimeoutSec,
-            long infoRetryDelayMs
-    ) {
-        this.name = name;
-        this.connections = connections;
-        this.xmltvUrl = xmltvUrl;
-        this.sendUser = sendUser;
-        this.proxyStream = proxyStream;
-        this.channelFailedMs = channelFailedMs;
-        this.infoTimeoutSec = infoTimeoutSec;
-        this.infoRetryDelayMs = infoRetryDelayMs;
+    private IptvServerConfig() {
     }
 
     public String getName() {
@@ -96,5 +77,87 @@ public class IptvServerConfig {
 
     public long getStreamReadTimeoutSec() {
         return streamReadTimeoutSec;
+    }
+
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final IptvServerConfig c = new IptvServerConfig();
+
+        public IptvServerConfig build() {
+            return c;
+        }
+
+        public Builder name(String name) {
+            c.name = name;
+            return this;
+        }
+
+        public Builder connections(Collection<IptvConnectionConfig> connections) {
+            c.connections = new ArrayList<>(connections);
+            return this;
+        }
+
+        public Builder xmltvUrl(String xmltvUrl) {
+            c.xmltvUrl = xmltvUrl;
+            return this;
+        }
+
+        public Builder sendUser(boolean sendUser) {
+            c.sendUser = sendUser;
+            return this;
+        }
+
+        public Builder proxyStream(boolean proxyStream) {
+            c.proxyStream = proxyStream;
+            return this;
+        }
+
+        public Builder channelFailedMs(long channelFailedMs) {
+            c.channelFailedMs = channelFailedMs;
+            return this;
+        }
+
+        public Builder infoTimeoutSec(long infoTimeoutSec) {
+            c.infoTimeoutSec = infoTimeoutSec;
+            return this;
+        }
+
+        public Builder infoTotalTimeoutSec(long infoTotalTimeoutSec) {
+            c.infoTotalTimeoutSec = infoTotalTimeoutSec;
+            return this;
+        }
+
+        public Builder infoRetryDelayMs(long infoRetryDelayMs) {
+            c.infoRetryDelayMs = infoRetryDelayMs;
+            return this;
+        }
+
+        public Builder catchupTimeoutSec(long catchupTimeoutSec) {
+            c.catchupTimeoutSec = catchupTimeoutSec;
+            return this;
+        }
+
+        public Builder catchupTotalTimeoutSec(long catchupTotalTimeoutSec) {
+            c.catchupTotalTimeoutSec = catchupTotalTimeoutSec;
+            return this;
+        }
+
+        public Builder catchupRetryDelayMs(long catchupRetryDelayMs) {
+            c.catchupRetryDelayMs = catchupRetryDelayMs;
+            return this;
+        }
+
+        public Builder streamStartTimeoutSec(long streamStartTimeoutSec) {
+            c.streamStartTimeoutSec = streamStartTimeoutSec;
+            return this;
+        }
+
+        public Builder streamReadTimeoutSec(long streamReadTimeoutSec) {
+            c.streamReadTimeoutSec = streamReadTimeoutSec;
+            return this;
+        }
     }
 }
