@@ -19,7 +19,7 @@ public class HttpUtils {
 
     public static boolean isOk(HttpResponse<?> resp, Throwable err, HttpServerExchange exchange, String rid) {
         if (resp == null) {
-            LOG.warn(rid + "io error: {}", err == null ? "timeout" : err.getMessage());
+            LOG.warn(rid + "io error: {}", err == null ? "timeout" : (err.getMessage() == null ? err : err.getMessage()));
             if (exchange != null) {
                 exchange.setStatusCode(HttpURLConnection.HTTP_INTERNAL_ERROR);
                 exchange.getResponseSender().send("error");
