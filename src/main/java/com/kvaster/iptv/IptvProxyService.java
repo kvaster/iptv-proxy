@@ -308,6 +308,8 @@ public class IptvProxyService implements HttpHandler {
         channels = chs;
         serverChannelsByUrl = byUrl;
 
+        LOG.info("channels updated");
+
         return true;
     }
 
