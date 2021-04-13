@@ -4,6 +4,7 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPInputStream;
@@ -41,23 +42,23 @@ public class XmltvUtils {
     }
 
     public static XmltvDoc parseXmltv(byte[] data) {
-        if (data.length >= 2 && data[0] == (byte)0x1f && data[1] == (byte)0x8b) {
-            try {
-                try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(data))) {
-                    data = gis.readAllBytes();
-                }
-            } catch (IOException e) {
-                LOG.error("error decompressing gzip packed xmltv data");
-                return null;
-            }
-        }
-
         try {
-            return xmltvMapper.readValue(data, XmltvDoc.class);
+            try (InputStream is = openStream(data)) {
+                return xmltvMapper.readValue(is, XmltvDoc.class);
+            }
         } catch (IOException e) {
             LOG.error("error parsing xmltv data");
             return null;
         }
+    }
+
+    private static InputStream openStream(byte[] data) throws IOException {
+        InputStream is = new ByteArrayInputStream(data);
+        if (data.length >= 2 && data[0] == (byte)0x1f && data[1] == (byte)0x8b) {
+            is = new GZIPInputStream(is);
+        }
+
+        return is;
     }
 
     public static byte[] writeXmltv(XmltvDoc xmltv) {
