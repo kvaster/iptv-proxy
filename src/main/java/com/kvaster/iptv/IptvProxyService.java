@@ -304,9 +304,12 @@ public class IptvProxyService implements HttpHandler {
             }
         }
 
-        xmltvData = XmltvUtils.writeXmltv(newXmltv);
+        // update channels as fast as possible
         channels = chs;
         serverChannelsByUrl = byUrl;
+
+        // xmltv data can be updated later - writeXmltv() takes some time
+        xmltvData = XmltvUtils.writeXmltv(newXmltv);
 
         LOG.info("channels updated.");
 
