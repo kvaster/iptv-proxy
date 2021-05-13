@@ -10,11 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +35,6 @@ public class IptvServerChannel {
     private static final Logger LOG = LoggerFactory.getLogger(IptvServerChannel.class);
 
     private static final String TAG_EXTINF = "#EXTINF:";
-    private static final String TAG_PROGRAM_DATE_TIME = "#EXT-X-PROGRAM-DATE-TIME:";
     private static final String TAG_TARGET_DURATION = "#EXT-X-TARGETDURATION:";
 
     private final IptvServer server;
@@ -62,20 +58,18 @@ public class IptvServerChannel {
         String path;
         String url;
         String header;
-        long startTime;
         long durationMillis;
 
-        Stream(String path, String url, String header, long startTime, long durationMillis) {
+        Stream(String path, String url, String header, long durationMillis) {
             this.path = path;
             this.url = url;
             this.header = header;
-            this.startTime = startTime;
             this.durationMillis = durationMillis;
         }
 
         @Override
         public String toString() {
-            return "[path: " + path + ", url: " + url + ", start: " + new Date(startTime) + ", duration: " + (durationMillis / 1000f) + "s]";
+            return "[path: " + path + ", url: " + url + ", duration: " + (durationMillis / 1000f) + "s]";
         }
     }
 
@@ -365,10 +359,7 @@ public class IptvServerChannel {
                         Map<String, Stream> streamMap = new HashMap<>();
                         Streams streams = new Streams();
 
-                        long m3uStart = 0;
-
                         long durationMillis = 0;
-                        long startTime = 0;
 
                         for (String l : info) {
                             l = l.trim();
@@ -385,13 +376,6 @@ public class IptvServerChannel {
                                         durationMillis = new BigDecimal(v).multiply(new BigDecimal(1000)).longValue();
                                         streams.maxDuration = Math.max(streams.maxDuration, durationMillis);
                                     } catch (NumberFormatException e) {
-                                        // do nothing
-                                    }
-                                } else if (l.startsWith(TAG_PROGRAM_DATE_TIME)) {
-                                    try {
-                                        ZonedDateTime dateTime = ZonedDateTime.parse(l.substring(TAG_PROGRAM_DATE_TIME.length()), DateTimeFormatter.ISO_DATE_TIME);
-                                        m3uStart = startTime = dateTime.toInstant().toEpochMilli();
-                                    } catch (Exception e) {
                                         // do nothing
                                     }
                                 } else if (l.startsWith(TAG_TARGET_DURATION)) {
@@ -429,13 +413,12 @@ public class IptvServerChannel {
 
 
                                 String path = digest.digest(l) + ".ts";
-                                Stream s = new Stream(path, l, sb.toString(), startTime, durationMillis);
+                                Stream s = new Stream(path, l, sb.toString(), durationMillis);
                                 streamMap.put(path, s);
                                 streams.streams.add(s);
 
                                 sb = new StringBuilder();
 
-                                startTime = durationMillis == 0 ? 0 : startTime + durationMillis;
                                 durationMillis = 0;
                             }
                         }
@@ -456,7 +439,7 @@ public class IptvServerChannel {
                             user.unlock();
                         }
 
-                        LOG.info("{}[{}] m3u start: {}, end: {}, maxDuration: {}s", rid, user.getId(), new Date(m3uStart), new Date(startTime), streams.maxDuration / 1000f);
+                        LOG.info("{}[{}] m3u maxDuration: {}s", rid, user.getId(), streams.maxDuration / 1000f);
 
                         cs.forEach(c -> c.onInfo(streams, -1));
                     } else {
