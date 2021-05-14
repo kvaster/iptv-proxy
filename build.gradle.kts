@@ -1,11 +1,11 @@
 // common libs
-val jacksonVersion = "2.11.3"
-val jacksonDatabindVersion = "2.11.3"
-val janinoVersion = "3.1.0"
+val jacksonVersion = "2.12.3"
+val jacksonDatabindVersion = "2.12.3"
+val janinoVersion = "3.1.4"
 val logbackVersion = "1.2.3"
-val slf4jVersion = "1.7.26"
-val snakeYamlVersion = "1.27"
-val undertowVersion = "2.2.2.Final"
+val slf4jVersion = "1.7.30"
+val snakeYamlVersion = "1.28"
+val undertowVersion = "2.2.7.Final"
 
 plugins {
     java
@@ -46,7 +46,7 @@ java {
 }
 
 application {
-    mainClassName = "com.kvaster.iptv.App"
+    mainClass.set("com.kvaster.iptv.App")
 }
 
 configurations.forEach {
