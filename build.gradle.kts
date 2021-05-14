@@ -46,7 +46,7 @@ java {
 }
 
 application {
-    mainClass.set("com.kvaster.iptv.App")
+    mainClassName = "com.kvaster.iptv.App"
 }
 
 configurations.forEach {

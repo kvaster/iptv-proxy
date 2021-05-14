@@ -53,8 +53,8 @@ public class IptvProxyService implements HttpHandler {
 
     private final Undertow undertow;
 
-    // use two threads instead of one
-    private final ScheduledExecutorService scheduler = new ScheduledThreadPoolExecutor(2);
+    private static final int SCHEDULER_THREADS = 2;
+    private final ScheduledExecutorService scheduler = createScheduler();
 
     private final BaseUrl baseUrl;
     private final String tokenSalt;
@@ -77,6 +77,14 @@ public class IptvProxyService implements HttpHandler {
     private final HttpClient defaultHttpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
+
+    private static ScheduledExecutorService createScheduler() {
+        ScheduledThreadPoolExecutor s = new ScheduledThreadPoolExecutor(SCHEDULER_THREADS, (r, e) -> LOG.error("execution rejected"));
+        s.setRemoveOnCancelPolicy(true);
+        s.setMaximumPoolSize(SCHEDULER_THREADS);
+
+        return s;
+    }
 
     public IptvProxyService(IptvProxyConfig config) {
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());

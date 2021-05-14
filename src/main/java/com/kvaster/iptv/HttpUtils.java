@@ -2,6 +2,7 @@ package com.kvaster.iptv;
 
 import java.net.HttpURLConnection;
 import java.net.http.HttpResponse;
+import java.util.concurrent.TimeoutException;
 
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HttpString;
@@ -19,7 +20,8 @@ public class HttpUtils {
 
     public static boolean isOk(HttpResponse<?> resp, Throwable err, HttpServerExchange exchange, String rid) {
         if (resp == null) {
-            LOG.warn(rid + "io error: {}", err == null ? "timeout" : (err.getMessage() == null ? err : err.getMessage()));
+            String errMsg = (err == null || err instanceof TimeoutException) ? "timeout" : (err.getMessage() == null ? err.toString() : err.getMessage());
+            LOG.warn(rid + "io error: {}", errMsg);
             if (exchange != null) {
                 exchange.setStatusCode(HttpURLConnection.HTTP_INTERNAL_ERROR);
                 exchange.getResponseSender().send("error");
