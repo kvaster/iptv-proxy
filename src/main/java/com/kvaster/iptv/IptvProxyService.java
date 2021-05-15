@@ -74,9 +74,7 @@ public class IptvProxyService implements HttpHandler {
     private final AsyncLoader<byte[]> xmltvLoader;
     private volatile byte[] xmltvData = null;
 
-    private final HttpClient defaultHttpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.ALWAYS)
-            .build();
+    private final HttpClient defaultHttpClient;
 
     private static ScheduledExecutorService createScheduler() {
         ScheduledThreadPoolExecutor s = new ScheduledThreadPoolExecutor(SCHEDULER_THREADS, (r, e) -> LOG.error("execution rejected"));
@@ -87,6 +85,11 @@ public class IptvProxyService implements HttpHandler {
     }
 
     public IptvProxyService(IptvProxyConfig config) {
+        defaultHttpClient = HttpClient.newBuilder()
+                .version(config.getUseHttp2() ? HttpClient.Version.HTTP_2 : HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .build();
+
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
 
         this.tokenSalt = config.getTokenSalt();

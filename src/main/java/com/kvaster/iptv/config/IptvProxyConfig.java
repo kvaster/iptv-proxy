@@ -21,6 +21,7 @@ public class IptvProxyConfig {
     private long xmltvTimeoutSec = 30;
     private long xmltvTotalTimeoutSec = 120;
     private long xmltvRetryDelayMs = 1000;
+    private boolean useHttp2 = false;
 
     protected IptvProxyConfig() {
     }
@@ -79,6 +80,10 @@ public class IptvProxyConfig {
 
     public long getXmltvRetryDelayMs() {
         return xmltvRetryDelayMs;
+    }
+
+    public boolean getUseHttp2() {
+        return useHttp2;
     }
 
     public static Builder newBuilder() {
@@ -159,6 +164,11 @@ public class IptvProxyConfig {
 
         public Builder xmltvRetryDelayMs(long xmltvRetryDelayMs) {
             c.xmltvRetryDelayMs = xmltvRetryDelayMs;
+            return this;
+        }
+
+        public Builder useHttp2(boolean useHttp2) {
+            c.useHttp2 = useHttp2;
             return this;
         }
     }

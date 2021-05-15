@@ -21,6 +21,10 @@ token_salt: 6r8bt67ta5e87tg7afn
 channels_timeout_sec: 5
 channels_total_timeout_sec: 60
 channels_retry_delay_ms: 1000
+xmltv_timeout_sec: 30
+xmltv_total_timeout_sec: 120
+xmltv_retry_delay_ms: 1000
+use_http2: false
 servers:
   - name: someiptv-1
     connections:
@@ -58,6 +62,10 @@ users:
 * `channels_timeout_sec` - timeout for single request (default is 5 sec) 
 * `channels_total_timeout_sec` - total timeout for channels loading (default is 60 sec)
 * `channels_retry_delay_ms` - delay between requests (default is 1000 ms)
+* `xmltv_timeout_sec` - timeout for single xmltv data request (default is 30 sec)
+* `xmltv_total_timeout_sec` - total timeout for loading xmltv data (default is 120 sec)
+* `xmltv_retry_delay_ms` - delat between retries (default is 1000 ms)
+* `use_http2` - use http2 when available, default is false - where are some strange problems with recent nginx and we really don't need http2
 * `max_connections` - max active connections allowed for this playlist
 * `login` - login for basic authentication (useful for tvheadend iptv playlists)
 * `password` - password for basic authentication (useful for tvheadend iptv playlists)
