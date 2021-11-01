@@ -63,10 +63,11 @@ public class AsyncLoader<T> {
     ) {
         LOG.info("{}loading {}, retry: {}, url: {}", rid, msg, retryNo, req.uri());
 
+        final long startNanos = System.nanoTime();
         httpClient.sendAsync(req, handlerSupplier.get())
                 .orTimeout(timeoutSec, TimeUnit.SECONDS)
                 .whenComplete((resp, err) -> {
-                    if (HttpUtils.isOk(resp, err, rid)) {
+                    if (HttpUtils.isOk(resp, err, rid, startNanos)) {
                         future.complete(resp.body());
                     } else {
                         if (System.currentTimeMillis() < expireTime) {

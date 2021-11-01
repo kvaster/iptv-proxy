@@ -19,7 +19,7 @@ public class M3uParser {
     private static final Pattern TAG_PAT = Pattern.compile("#(\\w+)(?:[ :](.*))?");
     private static final Pattern PROP_PAT = Pattern.compile(" *([\\w-_]+)=\"([^\"]*)\"(.*)");
     private static final Pattern PROP_NONSTD_PAT = Pattern.compile(" *([\\w-_]+)=([^\"][^ ]*)(.*)");
-    private static final Pattern INFO_PAT = Pattern.compile("([-+0-9]+) ?(.*),([^,]+)");
+    private static final Pattern INFO_PAT = Pattern.compile("([-+0-9]+) ?(.*)");
 
     public static M3uDoc parse(String content) {
         Map<String, String> m3uProps = Collections.emptyMap();//new HashMap<>();
@@ -39,7 +39,10 @@ public class M3uParser {
                     case "EXTM3U":
                         String p = m.group(2);
                         if (p != null) {
-                            m3uProps = parseProps(m.group(2));
+                            String prop = parseProps(m.group(2), m3uProps = new HashMap<>()).strip();
+                            if (!prop.isEmpty()) {
+                                LOG.warn("malformed property: {}", prop);
+                            }
                         }
                         break;
 
@@ -47,8 +50,10 @@ public class M3uParser {
                         String infoLine = m.group(2);
                         m = INFO_PAT.matcher(infoLine);
                         if (m.matches()) {
-                            name = m.group(3);
-                            props = parseProps(m.group(2));
+                            name = parseProps(m.group(2), props = new HashMap<>()).strip();
+                            if (name.startsWith(",")) {
+                                name = name.substring(1).strip();
+                            }
                         } else {
                             LOG.error("malformed channel info: {}", infoLine);
                             return null;
@@ -85,8 +90,9 @@ public class M3uParser {
         return new M3uDoc(channels, m3uProps);
     }
 
-    private static Map<String, String> parseProps(String line) {
-        Map<String, String> props = new HashMap<>();
+    private static String parseProps(String line, Map<String, String> props) {
+        String postfix = "";
+        List<String> malformedProps = new ArrayList<>();
 
         while (line.length() > 0) {
             Matcher m = PROP_PAT.matcher(line);
@@ -96,6 +102,12 @@ public class M3uParser {
             if (m.matches()) {
                 props.put(m.group(1), m.group(2));
                 line = m.group(3).strip();
+                postfix = line;
+
+                if (!malformedProps.isEmpty()) {
+                    malformedProps.forEach(prop -> LOG.warn("malformed property: {}", prop));
+                    malformedProps.clear();
+                }
             } else {
                 // try to continue parsing properties
                 int idx = line.indexOf(' ');
@@ -103,12 +115,12 @@ public class M3uParser {
                     idx = line.length();
                 }
 
-                LOG.warn("malformed property: {}", line.substring(0, idx));
+                malformedProps.add(line.substring(0, idx));
 
                 line = line.substring(idx).strip();
             }
         }
 
-        return props;
+        return postfix;
     }
 }

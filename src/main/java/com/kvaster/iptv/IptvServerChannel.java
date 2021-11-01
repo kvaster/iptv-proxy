@@ -75,8 +75,8 @@ public class IptvServerChannel {
 
     private static class Streams {
         List<Stream> streams = new ArrayList<>();
-        // cache only for 1s to avoid burst requests
-        long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
+        // cache only for 100ms to avoid burst requests
+        long expireTimeNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100);
         long maxDuration = 0;
     }
 
@@ -257,11 +257,13 @@ public class IptvServerChannel {
         user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getStreamStartTimeoutSec()) + 100);
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
+            long startNanos = System.nanoTime();
+
             // configure buffering according to undertow buffers settings for best performance
             httpClient.sendAsync(createRequest(url, user), HttpResponse.BodyHandlers.ofPublisher())
                     .orTimeout(server.getStreamStartTimeoutSec(), TimeUnit.SECONDS)
                     .whenComplete((resp, err) -> {
-                        if (HttpUtils.isOk(resp, err, exchange, rid)) {
+                        if (HttpUtils.isOk(resp, err, exchange, rid, startNanos)) {
                             resp.headers().map().forEach((name, values) -> {
                                 if (HEADERS.contains(name.toLowerCase())) {
                                     exchange.getResponseHeaders().addAll(new HttpString(name), values);
@@ -271,7 +273,7 @@ public class IptvServerChannel {
                             exchange.getResponseHeaders().add(HttpUtils.ACCESS_CONTROL, "*");
 
                             long readTimeoutMs = TimeUnit.SECONDS.toMillis(server.getStreamReadTimeoutSec());
-                            resp.body().subscribe(new IptvStream(exchange, rid, user, Math.max(timeout, readTimeoutMs), readTimeoutMs, scheduler));
+                            resp.body().subscribe(new IptvStream(exchange, rid, user, Math.max(timeout, readTimeoutMs), readTimeoutMs, scheduler, startNanos));
                         }
                     });
         });
@@ -286,6 +288,7 @@ public class IptvServerChannel {
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             String rid = RequestCounter.next();
             LOG.info("{}[{}] channel: {}, url: {}", rid, user.getId(), channelName, us.channelUrl);
+            long startNanos = System.nanoTime();
             loadCachedInfo((streams, statusCode) -> {
                 if (streams == null) {
                     LOG.warn("{}[{}] error loading streams info: {}", rid, user.getId(), statusCode);
@@ -293,7 +296,7 @@ public class IptvServerChannel {
                     exchange.setStatusCode(statusCode);
                     exchange.getResponseSender().send("error");
                 } else {
-                    LOG.info("{}[{}] ok", rid, user.getId());
+                    LOG.info("{}[{}] success: {}ms", rid, user.getId(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
 
                     StringBuilder sb = new StringBuilder();
 
@@ -320,7 +323,7 @@ public class IptvServerChannel {
 
         user.lock();
         try {
-            if (us.streams != null && System.currentTimeMillis() < us.streams.expireTime) {
+            if (us.streams != null && (us.streams.expireTimeNanos - System.nanoTime()) > 0) {
                 s = us.streams;
             } else {
                 us.streams = null;
@@ -347,10 +350,11 @@ public class IptvServerChannel {
     private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user, UserStreams us) {
         LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, us.channelUrl, retryNo);
 
+        final long startNanos = System.nanoTime();
         httpClient.sendAsync(createRequest(us.channelUrl, user), HttpResponse.BodyHandlers.ofString())
                 .orTimeout(us.isCatchup ? server.getCatchupTimeoutSec() : server.getInfoTimeoutSec(), TimeUnit.SECONDS)
                 .whenComplete((resp, err) -> {
-                    if (HttpUtils.isOk(resp, err, rid)) {
+                    if (HttpUtils.isOk(resp, err, rid, startNanos)) {
                         String[] info = resp.body().split("\n");
 
                         Digest digest = Digest.sha256();

@@ -2,6 +2,7 @@ package com.kvaster.iptv;
 
 import java.net.HttpURLConnection;
 import java.net.http.HttpResponse;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import io.undertow.server.HttpServerExchange;
@@ -14,11 +15,11 @@ public class HttpUtils {
 
     public static HttpString ACCESS_CONTROL = new HttpString("Access-Control-Allow-Origin");
 
-    public static boolean isOk(HttpResponse<?> resp, Throwable err, String rid) {
-        return isOk(resp, err, null, rid);
+    public static boolean isOk(HttpResponse<?> resp, Throwable err, String rid, long startNanos) {
+        return isOk(resp, err, null, rid, startNanos);
     }
 
-    public static boolean isOk(HttpResponse<?> resp, Throwable err, HttpServerExchange exchange, String rid) {
+    public static boolean isOk(HttpResponse<?> resp, Throwable err, HttpServerExchange exchange, String rid, long startNanos) {
         if (resp == null) {
             String errMsg = (err == null || err instanceof TimeoutException) ? "timeout" : (err.getMessage() == null ? err.toString() : err.getMessage());
             LOG.warn(rid + "io error: {}", errMsg);
@@ -35,7 +36,7 @@ public class HttpUtils {
             }
             return false;
         } else {
-            LOG.debug("{}ok", rid);
+            LOG.debug("{}ok ({}ms)", rid, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
         }
 
         return true;

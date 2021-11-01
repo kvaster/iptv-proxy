@@ -1,20 +1,20 @@
 // common libs
-val jacksonVersion = "2.12.3"
-val jacksonDatabindVersion = "2.12.3"
-val janinoVersion = "3.1.4"
-val logbackVersion = "1.2.3"
-val slf4jVersion = "1.7.30"
-val snakeYamlVersion = "1.28"
-val undertowVersion = "2.2.7.Final"
+val jacksonVersion = "2.13.0"
+val jacksonDatabindVersion = "2.13.0"
+val janinoVersion = "3.1.6"
+val logbackVersion = "1.2.6"
+val slf4jVersion = "1.7.32"
+val snakeYamlVersion = "1.29"
+val undertowVersion = "2.2.12.Final"
 
 plugins {
     java
     application
-    id("com.github.johnrengelman.shadow") version "5.2.0"
+    id("com.github.johnrengelman.shadow") version "7.1.0"
 }
 
 tasks.wrapper {
-    gradleVersion = "7.0.1"
+    gradleVersion = "7.2"
     distributionType = Wrapper.DistributionType.ALL
 }
 
@@ -46,7 +46,7 @@ java {
 }
 
 application {
-    mainClassName = "com.kvaster.iptv.App"
+    mainClass.set("com.kvaster.iptv.App")
 }
 
 configurations.forEach {

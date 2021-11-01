@@ -46,7 +46,17 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     private volatile long timeoutTime;
     private volatile ScheduledFuture<?> timeoutFuture;
 
-    public IptvStream(HttpServerExchange exchange, String rid, IptvUser user, long userTimeout, long readTimeout, ScheduledExecutorService scheduler) {
+    private final long startNanos;
+
+    public IptvStream(
+            HttpServerExchange exchange,
+            String rid,
+            IptvUser user,
+            long userTimeout,
+            long readTimeout,
+            ScheduledExecutorService scheduler,
+            long startNanos
+    ) {
         this.exchange = exchange;
         this.rid = rid;
 
@@ -61,6 +71,8 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
         updateReadTimeout();
         timeoutFuture = scheduler.schedule(this::onTimeout, readTimeout, TimeUnit.MILLISECONDS);
+
+        this.startNanos = startNanos;
     }
 
     private void updateReadTimeout() {
@@ -187,5 +199,7 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
         //LOG.debug("{}read complete", rid);
         readMeter.finish();
         finish();
+
+        LOG.info("{}success: {}ms", rid, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
     }
 }
