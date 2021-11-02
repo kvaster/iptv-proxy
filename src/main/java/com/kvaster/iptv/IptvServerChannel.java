@@ -75,8 +75,6 @@ public class IptvServerChannel {
 
     private static class Streams {
         List<Stream> streams = new ArrayList<>();
-        // cache only for 100ms to avoid burst requests
-        long expireTimeNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(100);
         long maxDuration = 0;
     }
 
@@ -85,9 +83,9 @@ public class IptvServerChannel {
     }
 
     private static class UserStreams {
-        Streams streams;
         List<StreamsConsumer> consumers = new ArrayList<>();
         Map<String, Stream> streamMap = new HashMap<>();
+        long maxDuration; // corresponds to current streamMap
         long infoTimeout;
         String channelUrl;
         boolean isCatchup;
@@ -234,7 +232,7 @@ public class IptvServerChannel {
                 final String rid = RequestCounter.next();
                 LOG.info("{}[{}] stream: {}", rid, user.getId(), stream);
 
-                long timeout = calculateTimeout(us.streams.maxDuration);
+                long timeout = calculateTimeout(us.maxDuration);
                 user.setExpireTime(System.currentTimeMillis() + timeout);
 
                 runStream(rid, exchange, user, stream.url, timeout);
@@ -318,18 +316,12 @@ public class IptvServerChannel {
     }
 
     private void loadCachedInfo(StreamsConsumer consumer, IptvUser user, UserStreams us) {
-        Streams s = null;
-        boolean startReq = false;
+        boolean startReq;
 
         user.lock();
         try {
-            if (us.streams != null && (us.streams.expireTimeNanos - System.nanoTime()) > 0) {
-                s = us.streams;
-            } else {
-                us.streams = null;
-                startReq = us.consumers.size() == 0;
-                us.consumers.add(consumer);
-            }
+            startReq = us.consumers.size() == 0;
+            us.consumers.add(consumer);
         } finally {
             user.unlock();
         }
@@ -342,8 +334,6 @@ public class IptvServerChannel {
                     user,
                     us
             );
-        } else if (s != null) {
-            consumer.onInfo(s, 0);
         }
     }
 
@@ -432,10 +422,9 @@ public class IptvServerChannel {
                         user.lock();
                         try {
                             us.streamMap = streamMap;
-                            us.streams = streams;
+                            us.maxDuration = streams.maxDuration;
 
-                            us.infoTimeout = calculateTimeout(streams.maxDuration);
-
+                            us.infoTimeout = calculateTimeout(us.maxDuration);
                             user.setExpireTime(System.currentTimeMillis() + us.infoTimeout);
 
                             cs = us.getAndClearConsumers();
