@@ -159,8 +159,8 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
         if (b == END_MARKER) {
             exchange.endExchange();
-            //LOG.debug("{}write complete", rid);
             writeMeter.finish();
+            LOG.info("{}write success: {}ms", rid, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
 
             return true;
         }
@@ -196,10 +196,9 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
 
     @Override
     public void onComplete() {
-        //LOG.debug("{}read complete", rid);
         readMeter.finish();
         finish();
 
-        LOG.info("{}success: {}ms", rid, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
+        LOG.info("{}read success: {}ms", rid, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
     }
 }
