@@ -22,13 +22,16 @@ public class SpeedMeter {
     private long partTime;
     private long partBytes;
 
+    private long reqStartNanos;
+
     private static long getMonotonicMillis() {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
     }
 
-    public SpeedMeter(String rid) {
+    public SpeedMeter(String rid, long reqStartNanos) {
         this.rid = rid;
         this.time = this.partTime = getMonotonicMillis();
+        this.reqStartNanos = reqStartNanos;
     }
 
     public void processed(long len) {
@@ -51,7 +54,10 @@ public class SpeedMeter {
             logPart();
         }
 
-        LOG.debug("{}finished: {}, speed: {}/s", rid, format(bytes), format(bytes * 1000 / (now - time)));
+        LOG.debug("{}finished: {}, speed: {}/s, {}ms",
+                rid, format(bytes),
+                format(bytes * 1000 / (now - time)),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - reqStartNanos));
     }
 
     private void logPart() {

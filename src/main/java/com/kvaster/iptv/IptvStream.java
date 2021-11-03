@@ -66,8 +66,8 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
         this.scheduler = scheduler;
         this.readTimeout = readTimeout;
 
-        readMeter = new SpeedMeter(rid + "read: ");
-        writeMeter = new SpeedMeter(rid + "write: ");
+        readMeter = new SpeedMeter(rid + "read: ", startNanos);
+        writeMeter = new SpeedMeter(rid + "write: ", startNanos);
 
         updateReadTimeout();
         timeoutFuture = scheduler.schedule(this::onTimeout, readTimeout, TimeUnit.MILLISECONDS);
@@ -160,8 +160,6 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
         if (b == END_MARKER) {
             exchange.endExchange();
             writeMeter.finish();
-            LOG.info("{}write success: {}ms", rid, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
-
             return true;
         }
 
@@ -198,7 +196,5 @@ public class IptvStream implements Subscriber<List<ByteBuffer>> {
     public void onComplete() {
         readMeter.finish();
         finish();
-
-        LOG.info("{}read success: {}ms", rid, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
     }
 }
