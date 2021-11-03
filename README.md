@@ -42,14 +42,14 @@ servers:
     send_user: true
     proxy_stream: true
     channel_failed_ms: 1000
-    info_timeout_sec: 2
-    info_total_timeout_sec: 5
+    info_timeout_ms: 1000
+    info_total_timeout_ms: 2000
     info_retry_delay_ms: 100
-    catchup_timeout_sec: 5
-    catchup_total_timeout_sec: 10
+    catchup_timeout_ms: 1000
+    catchup_total_timeout_ms: 2000
     catchup_retry_delay_ms: 100
-    stream_start_timeout_sec: 2
-    stream_read_timeout_sec: 2
+    stream_start_timeout_ms: 1000
+    stream_read_timeout_ms: 1000
 allow_anonymous: false
 users:
   - 65182_login1
@@ -80,15 +80,15 @@ false means using direct urls for data
 it will be marked as 'failed' for some time and will be not used for any subsequent requests.
 This feature should be enabled for last iptvproxy in chain (the one which connects to your iptv service)
 and should be disabled in other situation
-* `info_timeout_sec` - timeout for single request (default is 2 sec)
-* `info_total_timeout_sec` - some providers may return 404 http error on m3u8 request. This setting
-will trigger automatic request retry. We'll be trying to make additional requests for this period. (default is 5 sec).
-* `info_retry_delay_ms` - delay in milliseconds between retries (default is 100 ms).
-* `catchup_timeout_sec` - same as `info_timeout_sec` but used only with catchup (channel archive, timeshift, default is 5 sec).
-* `catchup_total_timeout_sec` - same as `info_total_timeout_sec` but used only with catchup (default is 10 sec).
+* `info_timeout_ms` - timeout for single request (default is 2000ms)
+* `info_total_timeout_ms` - some providers may return 404 http error on m3u8 request. This setting
+will trigger automatic request retry. We'll be trying to make additional requests for this period. (default is 2000ms).
+* `info_retry_delay_ms` - delay in milliseconds between retries (default is 100ms).
+* `catchup_timeout_sec` - same as `info_timeout_ms` but used only with catchup (channel archive, timeshift, default is 1000ms).
+* `catchup_total_timeout_ms` - same as `info_total_timeout_ms` but used only with catchup (default is 2000ms).
 * `catchup_retry_delay_ms` - same as `info_retry_delay_ms` but used only with catchup (default is 100ms).
-* `stream_start_timeout_sec` - timeout for starting actually streaming data (default is 2 sec)
-* `stream_read_timeout_sec` - read timeout during streaming - time between any data packets (default is 2 sec) 
+* `stream_start_timeout_ms` - timeout for starting actually streaming data (default is 1000ms)
+* `stream_read_timeout_ms` - read timeout during streaming - time between any data packets (default is 1000ms) 
 * `allow_anonymous` - allow to connect any device without specific user name.
 It is not good idea to use such setup. You really should add name for each device you're using.
 

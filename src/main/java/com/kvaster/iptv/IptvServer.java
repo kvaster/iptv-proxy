@@ -49,36 +49,36 @@ public class IptvServer {
         return sc.getChannelFailedMs();
     }
 
-    public long getInfoTimeoutSec() {
-        return sc.getInfoTimeoutSec();
+    public long getInfoTimeoutMs() {
+        return sc.getInfoTimeoutMs();
     }
 
-    public long getInfoTotalTimeoutSec() {
-        return sc.getInfoTotalTimeoutSec();
+    public long getInfoTotalTimeoutMs() {
+        return sc.getInfoTotalTimeoutMs();
     }
 
     public long getInfoRetryDelayMs() {
         return sc.getInfoRetryDelayMs();
     }
 
-    public long getCatchupTimeoutSec() {
-        return sc.getCatchupTimeoutSec();
+    public long getCatchupTimeoutMs() {
+        return sc.getCatchupTimeoutMs();
     }
 
-    public long getCatchupTotalTimeoutSec() {
-        return sc.getCatchupTotalTimeoutSec();
+    public long getCatchupTotalTimeoutMs() {
+        return sc.getCatchupTotalTimeoutMs();
     }
 
     public long getCatchupRetryDelayMs() {
         return sc.getCatchupRetryDelayMs();
     }
 
-    public long getStreamStartTimeoutSec() {
-        return sc.getStreamStartTimeoutSec();
+    public long getStreamStartTimeoutMs() {
+        return sc.getStreamStartTimeoutMs();
     }
 
-    public long getStreamReadTimeoutSec() {
-        return sc.getStreamReadTimeoutSec();
+    public long getStreamReadTimeoutMs() {
+        return sc.getStreamReadTimeoutMs();
     }
 
     public synchronized boolean acquire() {

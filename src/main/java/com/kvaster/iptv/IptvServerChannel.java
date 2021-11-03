@@ -132,8 +132,8 @@ public class IptvServerChannel {
 
         this.scheduler = scheduler;
 
-        defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(server.getInfoTotalTimeoutSec(), server.getInfoTimeoutSec()) + 1);
-        defaultCatchupTimeout = TimeUnit.SECONDS.toMillis(Math.max(server.getCatchupTotalTimeoutSec(), server.getCatchupTimeoutSec()) + 1);
+        defaultInfoTimeout = Math.max(server.getInfoTotalTimeoutMs(), server.getInfoTimeoutMs()) + TimeUnit.SECONDS.toMillis(1);
+        defaultCatchupTimeout = Math.max(server.getCatchupTotalTimeoutMs(), server.getCatchupTimeoutMs()) + TimeUnit.SECONDS.toMillis(1);
 
         try {
             URI uri = new URI(channelUrl);
@@ -252,14 +252,14 @@ public class IptvServerChannel {
         }
 
         // be sure we have time to start stream
-        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getStreamStartTimeoutSec()) + 100);
+        user.setExpireTime(System.currentTimeMillis() + server.getStreamStartTimeoutMs() + 100);
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             long startNanos = System.nanoTime();
 
             // configure buffering according to undertow buffers settings for best performance
             httpClient.sendAsync(createRequest(url, user), HttpResponse.BodyHandlers.ofPublisher())
-                    .orTimeout(server.getStreamStartTimeoutSec(), TimeUnit.SECONDS)
+                    .orTimeout(server.getStreamStartTimeoutMs(), TimeUnit.MILLISECONDS)
                     .whenComplete((resp, err) -> {
                         if (HttpUtils.isOk(resp, err, exchange, rid, startNanos)) {
                             resp.headers().map().forEach((name, values) -> {
@@ -270,7 +270,7 @@ public class IptvServerChannel {
 
                             exchange.getResponseHeaders().add(HttpUtils.ACCESS_CONTROL, "*");
 
-                            long readTimeoutMs = TimeUnit.SECONDS.toMillis(server.getStreamReadTimeoutSec());
+                            long readTimeoutMs = server.getStreamReadTimeoutMs();
                             resp.body().subscribe(new IptvStream(exchange, rid, user, Math.max(timeout, readTimeoutMs), readTimeoutMs, scheduler, startNanos));
                         }
                     });
@@ -330,7 +330,7 @@ public class IptvServerChannel {
             loadInfo(
                     RequestCounter.next(),
                     0,
-                    System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(us.isCatchup ? server.getCatchupTotalTimeoutSec() : server.getInfoTotalTimeoutSec()),
+                    System.currentTimeMillis() + (us.isCatchup ? server.getCatchupTotalTimeoutMs() : server.getInfoTotalTimeoutMs()),
                     user,
                     us
             );
@@ -340,9 +340,12 @@ public class IptvServerChannel {
     private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user, UserStreams us) {
         LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, us.channelUrl, retryNo);
 
+        long timeout = us.isCatchup ? server.getCatchupTimeoutMs() : server.getInfoTimeoutMs();
+        timeout = Math.min(Math.max(100, expireTime - System.currentTimeMillis()), timeout);
+
         final long startNanos = System.nanoTime();
         httpClient.sendAsync(createRequest(us.channelUrl, user), HttpResponse.BodyHandlers.ofString())
-                .orTimeout(us.isCatchup ? server.getCatchupTimeoutSec() : server.getInfoTimeoutSec(), TimeUnit.SECONDS)
+                .orTimeout(timeout, TimeUnit.MILLISECONDS)
                 .whenComplete((resp, err) -> {
                     if (HttpUtils.isOk(resp, err, rid, startNanos)) {
                         String[] info = resp.body().split("\n");

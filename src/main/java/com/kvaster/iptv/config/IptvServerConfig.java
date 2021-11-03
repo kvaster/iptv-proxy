@@ -11,14 +11,14 @@ public class IptvServerConfig {
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
-    private long infoTimeoutSec = 1;
-    private long infoTotalTimeoutSec = 3;
+    private long infoTimeoutMs = 1000;
+    private long infoTotalTimeoutMs = 2000;
     private long infoRetryDelayMs = 100;
-    private long catchupTimeoutSec = 1;
-    private long catchupTotalTimeoutSec = 3;
+    private long catchupTimeoutMs = 1000;
+    private long catchupTotalTimeoutMs = 2000;
     private long catchupRetryDelayMs = 100;
-    private long streamStartTimeoutSec = 1;
-    private long streamReadTimeoutSec = 1;
+    private long streamStartTimeoutMs = 1000;
+    private long streamReadTimeoutMs = 1000;
 
     private IptvServerConfig() {
     }
@@ -47,36 +47,36 @@ public class IptvServerConfig {
         return channelFailedMs;
     }
 
-    public long getInfoTimeoutSec() {
-        return infoTimeoutSec;
+    public long getInfoTimeoutMs() {
+        return infoTimeoutMs;
     }
 
-    public long getInfoTotalTimeoutSec() {
-        return infoTotalTimeoutSec;
+    public long getInfoTotalTimeoutMs() {
+        return infoTotalTimeoutMs;
     }
 
     public long getInfoRetryDelayMs() {
         return infoRetryDelayMs;
     }
 
-    public long getCatchupTimeoutSec() {
-        return catchupTimeoutSec;
+    public long getCatchupTimeoutMs() {
+        return catchupTimeoutMs;
     }
 
-    public long getCatchupTotalTimeoutSec() {
-        return catchupTotalTimeoutSec;
+    public long getCatchupTotalTimeoutMs() {
+        return catchupTotalTimeoutMs;
     }
 
     public long getCatchupRetryDelayMs() {
         return catchupRetryDelayMs;
     }
 
-    public long getStreamStartTimeoutSec() {
-        return streamStartTimeoutSec;
+    public long getStreamStartTimeoutMs() {
+        return streamStartTimeoutMs;
     }
 
-    public long getStreamReadTimeoutSec() {
-        return streamReadTimeoutSec;
+    public long getStreamReadTimeoutMs() {
+        return streamReadTimeoutMs;
     }
 
     public static Builder newBuilder() {
@@ -120,13 +120,13 @@ public class IptvServerConfig {
             return this;
         }
 
-        public Builder infoTimeoutSec(long infoTimeoutSec) {
-            c.infoTimeoutSec = infoTimeoutSec;
+        public Builder infoTimeoutMs(long infoTimeoutMs) {
+            c.infoTimeoutMs = infoTimeoutMs;
             return this;
         }
 
-        public Builder infoTotalTimeoutSec(long infoTotalTimeoutSec) {
-            c.infoTotalTimeoutSec = infoTotalTimeoutSec;
+        public Builder infoTotalTimeoutMs(long infoTotalTimeoutMs) {
+            c.infoTotalTimeoutMs = infoTotalTimeoutMs;
             return this;
         }
 
@@ -135,13 +135,13 @@ public class IptvServerConfig {
             return this;
         }
 
-        public Builder catchupTimeoutSec(long catchupTimeoutSec) {
-            c.catchupTimeoutSec = catchupTimeoutSec;
+        public Builder catchupTimeoutMs(long catchupTimeoutMs) {
+            c.catchupTimeoutMs = catchupTimeoutMs;
             return this;
         }
 
-        public Builder catchupTotalTimeoutSec(long catchupTotalTimeoutSec) {
-            c.catchupTotalTimeoutSec = catchupTotalTimeoutSec;
+        public Builder catchupTotalTimeoutMs(long catchupTotalTimeoutMs) {
+            c.catchupTotalTimeoutMs = catchupTotalTimeoutMs;
             return this;
         }
 
@@ -150,13 +150,13 @@ public class IptvServerConfig {
             return this;
         }
 
-        public Builder streamStartTimeoutSec(long streamStartTimeoutSec) {
-            c.streamStartTimeoutSec = streamStartTimeoutSec;
+        public Builder streamStartTimeoutMs(long streamStartTimeoutMs) {
+            c.streamStartTimeoutMs = streamStartTimeoutMs;
             return this;
         }
 
-        public Builder streamReadTimeoutSec(long streamReadTimeoutSec) {
-            c.streamReadTimeoutSec = streamReadTimeoutSec;
+        public Builder streamReadTimeoutMs(long streamReadTimeoutMs) {
+            c.streamReadTimeoutMs = streamReadTimeoutMs;
             return this;
         }
     }
