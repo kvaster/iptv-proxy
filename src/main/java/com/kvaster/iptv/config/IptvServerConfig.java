@@ -11,14 +11,14 @@ public class IptvServerConfig {
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
-    private long infoTimeoutSec = 2;
-    private long infoTotalTimeoutSec = 5;
+    private long infoTimeoutSec = 1;
+    private long infoTotalTimeoutSec = 3;
     private long infoRetryDelayMs = 100;
-    private long catchupTimeoutSec = 5;
-    private long catchupTotalTimeoutSec = 10;
+    private long catchupTimeoutSec = 1;
+    private long catchupTotalTimeoutSec = 3;
     private long catchupRetryDelayMs = 100;
-    private long streamStartTimeoutSec = 2;
-    private long streamReadTimeoutSec = 2;
+    private long streamStartTimeoutSec = 1;
+    private long streamReadTimeoutSec = 1;
 
     private IptvServerConfig() {
     }
