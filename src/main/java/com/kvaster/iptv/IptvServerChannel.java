@@ -79,7 +79,7 @@ public class IptvServerChannel {
     }
 
     private interface StreamsConsumer {
-        void onInfo(Streams streams, int statusCode);
+        void onInfo(Streams streams, int statusCode, int retryNo);
     }
 
     private static class UserStreams {
@@ -287,14 +287,19 @@ public class IptvServerChannel {
             String rid = RequestCounter.next();
             LOG.info("{}[{}] channel: {}, url: {}", rid, user.getId(), channelName, us.channelUrl);
             long startNanos = System.nanoTime();
-            loadCachedInfo((streams, statusCode) -> {
+            loadCachedInfo((streams, statusCode, retryNo) -> {
                 if (streams == null) {
-                    LOG.warn("{}[{}] error loading streams info: {}", rid, user.getId(), statusCode);
+                    LOG.warn("{}[{}] error loading streams info: {}, retries: {}", rid, user.getId(), statusCode, retryNo);
 
                     exchange.setStatusCode(statusCode);
                     exchange.getResponseSender().send("error");
                 } else {
-                    LOG.info("{}[{}] success: {}ms", rid, user.getId(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos));
+                    long duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+                    if (duration > 500 || retryNo > 0) {
+                        LOG.warn("{}[{}] channel success: {}ms, retries: {}", rid, user.getId(), duration, retryNo);
+                    } else {
+                        LOG.info("{}[{}] channel success: {}ms, retries: {}", rid, user.getId(), duration, retryNo);
+                    }
 
                     StringBuilder sb = new StringBuilder();
 
@@ -435,9 +440,7 @@ public class IptvServerChannel {
                             user.unlock();
                         }
 
-                        LOG.info("{}[{}] m3u maxDuration: {}s", rid, user.getId(), streams.maxDuration / 1000f);
-
-                        cs.forEach(c -> c.onInfo(streams, -1));
+                        cs.forEach(c -> c.onInfo(streams, -1, retryNo));
                     } else {
                         if (System.currentTimeMillis() < expireTime) {
                             LOG.info("{}[{}] will retry", rid, user.getId());
@@ -462,7 +465,7 @@ public class IptvServerChannel {
                             }
 
                             int statusCode = resp == null ? HttpURLConnection.HTTP_INTERNAL_ERROR : resp.statusCode();
-                            us.getAndClearConsumers().forEach(c -> c.onInfo(null, statusCode));
+                            us.getAndClearConsumers().forEach(c -> c.onInfo(null, statusCode, retryNo));
                         }
                     }
                 });
