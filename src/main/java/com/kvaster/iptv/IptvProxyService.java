@@ -399,7 +399,7 @@ public class IptvProxyService implements HttpHandler {
             return null;
         }
 
-        int idx = token.indexOf('-');
+        int idx = token.lastIndexOf('-');
         if (idx < 0) {
             return null;
         }
