@@ -25,6 +25,7 @@ xmltv_timeout_sec: 30
 xmltv_total_timeout_sec: 120
 xmltv_retry_delay_ms: 1000
 use_http2: false
+groups_include_regex:
 servers:
   - name: someiptv-1
     connections:
@@ -63,6 +64,7 @@ users:
 * `channels_total_timeout_sec` - total timeout for channels loading (default is 60 sec)
 * `channels_retry_delay_ms` - delay between requests (default is 1000 ms)
 * `xmltv_timeout_sec` - timeout for single xmltv data request (default is 30 sec)
+* `groups_include_regex` - regex pattern for all groups to include (include all if empty, default is empty)
 * `xmltv_total_timeout_sec` - total timeout for loading xmltv data (default is 120 sec)
 * `xmltv_retry_delay_ms` - delat between retries (default is 1000 ms)
 * `use_http2` - use http2 when available, default is false - where are some strange problems with recent nginx and we really don't need http2

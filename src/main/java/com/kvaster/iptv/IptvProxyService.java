@@ -7,6 +7,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +18,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 import com.kvaster.iptv.config.IptvProxyConfig;
 import com.kvaster.iptv.m3u.M3uDoc;
@@ -76,6 +78,8 @@ public class IptvProxyService implements HttpHandler {
 
     private final HttpClient defaultHttpClient;
 
+    private IptvProxyConfig config;
+
     private static ScheduledExecutorService createScheduler() {
         ScheduledThreadPoolExecutor s = new ScheduledThreadPoolExecutor(SCHEDULER_THREADS, (r, e) -> LOG.error("execution rejected"));
         s.setRemoveOnCancelPolicy(true);
@@ -92,6 +96,8 @@ public class IptvProxyService implements HttpHandler {
 
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
 
+        this.config = config;
+                        
         this.tokenSalt = config.getTokenSalt();
 
         this.allowAnonymous = config.getAllowAnonymous();
@@ -154,6 +160,23 @@ public class IptvProxyService implements HttpHandler {
 
     private boolean updateChannelsImpl() {
         LOG.info("updating channels");
+
+        Pattern groupsIncludePattern = null;
+        
+        if (config.getGroupsIncludeRegex() != null && !config.getGroupsIncludeRegex().isBlank())
+        {
+            try
+            {
+                groupsIncludePattern = (Pattern.compile(config.getGroupsIncludeRegex()));
+                LOG.info("successfully parsed groupsIncludePattern:" + groupsIncludePattern);
+            }
+            catch (Exception e)
+            {
+                LOG.error("error parsing groupsIncludePattern: " + config.getGroupsIncludeRegex(), e);
+            }
+        }
+
+        final Pattern finalGroupsIncludePattern = groupsIncludePattern;
 
         Map<String, IptvChannel> chs = new HashMap<>();
         Map<String, IptvServerChannel> byUrl = new HashMap<>();
@@ -243,10 +266,24 @@ public class IptvProxyService implements HttpHandler {
                     final String id = digest.digest(sg.name + "||" + c.getName());
                     final String url = c.getUrl();
 
+
                     IptvChannel channel = chs.get(id);
                     if (channel == null) {
                         String tvgId = c.getProp("tvg-id");
                         String tvgName = c.getProp("tvg-name");
+
+                        if (finalGroupsIncludePattern != null)
+                        {
+                            boolean hasMatch = false;
+                            if (c.getGroups() != null)
+                            {
+                                for (Iterator<String> iter = c.getGroups().iterator(); hasMatch == false && iter.hasNext();)
+                                {
+                                    if (finalGroupsIncludePattern.matcher(iter.next()).find()) hasMatch = true;
+                                }
+                            }
+                            if (!hasMatch) return;
+                        }
 
                         XmltvChannel xmltvCh = null;
                         if (tvgId != null) {

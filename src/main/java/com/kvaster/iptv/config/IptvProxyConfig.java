@@ -12,6 +12,8 @@ public class IptvProxyConfig {
     private String baseUrl;
     private String forwardedPass;
     private String tokenSalt;
+    private String groupsIncludeRegex;
+    
     private List<IptvServerConfig> servers;
     private boolean allowAnonymous = true;
     private Set<String> users = new HashSet<>();
@@ -24,6 +26,14 @@ public class IptvProxyConfig {
     private boolean useHttp2 = false;
 
     protected IptvProxyConfig() {
+    }
+
+    public String getGroupsIncludeRegex() {
+        return groupsIncludeRegex;
+    }
+
+    public void setGroupsIncludeRegx(String groupsIncludeRegex) {
+        this.groupsIncludeRegex = groupsIncludeRegex;
     }
 
     public String getHost() {

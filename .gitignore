@@ -3,3 +3,5 @@
 build
 tmp
 out
+/bin
+config.yml
