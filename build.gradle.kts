@@ -1,16 +1,17 @@
 // common libs
-val jacksonVersion = "2.13.0"
-val jacksonDatabindVersion = "2.13.0"
+val jacksonVersion = "2.13.1"
+val jacksonDatabindVersion = "2.13.2"
+val jacksonDataFormatXmlVersion = "2.13.2"
 val janinoVersion = "3.1.6"
-val logbackVersion = "1.2.6"
-val slf4jVersion = "1.7.32"
+val logbackVersion = "1.2.11"
+val slf4jVersion = "1.7.36"
 val snakeYamlVersion = "1.29"
-val undertowVersion = "2.2.12.Final"
+val undertowVersion = "2.2.16.Final"
 
 plugins {
     java
     application
-    id("com.github.johnrengelman.shadow") version "7.1.0"
+    id("com.github.johnrengelman.shadow") version "7.1.2"
 }
 
 tasks.wrapper {
@@ -34,7 +35,7 @@ dependencies {
     // app specific
     implementation("org.yaml:snakeyaml:$snakeYamlVersion")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksonVersion")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:$jacksonVersion")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:$jacksonDataFormatXmlVersion")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion")
     implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonDatabindVersion")
     implementation("io.undertow:undertow-core:$undertowVersion")
