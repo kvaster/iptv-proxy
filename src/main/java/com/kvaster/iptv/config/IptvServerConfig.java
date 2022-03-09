@@ -2,6 +2,7 @@ package com.kvaster.iptv.config;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -21,7 +22,7 @@ public class IptvServerConfig {
     private long streamStartTimeoutMs = 1000;
     private long streamReadTimeoutMs = 1000;
 
-    private List<Pattern> groupFilters = new ArrayList<>();
+    private List<Pattern> groupFilters = Collections.emptyList();
 
     private IptvServerConfig() {
     }
@@ -164,6 +165,11 @@ public class IptvServerConfig {
 
         public Builder streamReadTimeoutMs(long streamReadTimeoutMs) {
             c.streamReadTimeoutMs = streamReadTimeoutMs;
+            return this;
+        }
+
+        public Builder groupFilters(Collection<Pattern> groupFilters) {
+            c.groupFilters = new ArrayList<>(groupFilters);
             return this;
         }
     }
