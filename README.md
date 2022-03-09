@@ -50,6 +50,9 @@ servers:
     catchup_retry_delay_ms: 100
     stream_start_timeout_ms: 1000
     stream_read_timeout_ms: 1000
+    group_filters:
+      - 'movies'
+      - 'vid.*'
 allow_anonymous: false
 users:
   - 65182_login1
@@ -88,7 +91,8 @@ will trigger automatic request retry. We'll be trying to make additional request
 * `catchup_total_timeout_ms` - same as `info_total_timeout_ms` but used only with catchup (default is 2000ms).
 * `catchup_retry_delay_ms` - same as `info_retry_delay_ms` but used only with catchup (default is 100ms).
 * `stream_start_timeout_ms` - timeout for starting actually streaming data (default is 1000ms)
-* `stream_read_timeout_ms` - read timeout during streaming - time between any data packets (default is 1000ms) 
+* `stream_read_timeout_ms` - read timeout during streaming - time between any data packets (default is 1000ms)
+* `group_filters` - list of regex channel filters
 * `allow_anonymous` - allow to connect any device without specific user name.
 It is not good idea to use such setup. You really should add name for each device you're using.
 

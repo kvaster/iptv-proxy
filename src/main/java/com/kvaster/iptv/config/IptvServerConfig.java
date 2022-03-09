@@ -3,6 +3,7 @@ package com.kvaster.iptv.config;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class IptvServerConfig {
     private String name;
@@ -19,6 +20,8 @@ public class IptvServerConfig {
     private long catchupRetryDelayMs = 100;
     private long streamStartTimeoutMs = 1000;
     private long streamReadTimeoutMs = 1000;
+
+    private List<Pattern> groupFilters = new ArrayList<>();
 
     private IptvServerConfig() {
     }
@@ -77,6 +80,10 @@ public class IptvServerConfig {
 
     public long getStreamReadTimeoutMs() {
         return streamReadTimeoutMs;
+    }
+
+    public List<Pattern> getGroupFilters() {
+        return groupFilters;
     }
 
     public static Builder newBuilder() {

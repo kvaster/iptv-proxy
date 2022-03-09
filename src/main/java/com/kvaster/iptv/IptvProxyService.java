@@ -17,6 +17,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 import com.kvaster.iptv.config.IptvProxyConfig;
 import com.kvaster.iptv.m3u.M3uDoc;
@@ -40,12 +41,14 @@ public class IptvProxyService implements HttpHandler {
         final List<IptvServer> servers = new ArrayList<>();
 
         final String xmltvUrl;
+        final List<Pattern> groupFilters;
 
         byte[] xmltvCache;
 
-        IptvServerGroup(String name, String xmltvUrl) {
+        IptvServerGroup(String name, String xmltvUrl, List<Pattern> groupFilters) {
             this.name = name;
             this.xmltvUrl = xmltvUrl;
+            this.groupFilters = groupFilters;
         }
     }
 
@@ -106,7 +109,7 @@ public class IptvProxyService implements HttpHandler {
                 .build();
 
         config.getServers().forEach((sc) -> {
-            IptvServerGroup sg = new IptvServerGroup(sc.getName(), sc.getXmltvUrl());
+            IptvServerGroup sg = new IptvServerGroup(sc.getName(), sc.getXmltvUrl(), sc.getGroupFilters());
             serverGroups.add(sg);
             sc.getConnections().forEach((cc) -> sg.servers.add(new IptvServer(sc, cc, defaultHttpClient)));
         });
@@ -247,6 +250,13 @@ public class IptvProxyService implements HttpHandler {
                     if (channel == null) {
                         String tvgId = c.getProp("tvg-id");
                         String tvgName = c.getProp("tvg-name");
+
+                        if (!sg.groupFilters.isEmpty()) {
+                            if (c.getGroups().stream().noneMatch((g) -> sg.groupFilters.stream().anyMatch((f) -> f.matcher(g).find()))) {
+                                // skip channel - filtered by group filter
+                                return;
+                            }
+                        }
 
                         XmltvChannel xmltvCh = null;
                         if (tvgId != null) {
