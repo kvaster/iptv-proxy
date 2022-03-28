@@ -39,6 +39,8 @@ servers:
         login: mylogin
         password: mypassword
     xmltv_url: https://epg.example.com/epg.xml.gz
+    xmltv_before: p5d
+    xmltv_after: p1d
     send_user: true
     proxy_stream: true
     channel_failed_ms: 1000
@@ -73,6 +75,8 @@ users:
 * `login` - login for basic authentication (useful for tvheadend iptv playlists)
 * `password` - password for basic authentication (useful for tvheadend iptv playlists)
 * `xmltv_url` - url for xmltv data, epg for different servers will be reprocessed and combined to one file for all channels
+* `xmltv_after` - filter programmes after specified time (to reduce xmltv size), java duration format (p1d - one day), default - unlimited
+* `xmltv_before` - filter programmes before specified time (to reduce xmltv size), java duration format (p5d - five days), default - unlimited
 * `send_user` - this is useful only when you're using cascade config - iptv-proxy behind iptv-proxy.
 If 'true' then iptv-proxy will send current user name in special http header.
 We need this to identify device (endpoint) - this will help us to handle max connections and

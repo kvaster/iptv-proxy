@@ -1,5 +1,6 @@
 package com.kvaster.iptv.config;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -10,6 +11,8 @@ public class IptvServerConfig {
     private String name;
     private List<IptvConnectionConfig> connections;
     private String xmltvUrl;
+    private Duration xmltvBefore;
+    private Duration xmltvAfter;
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
@@ -37,6 +40,14 @@ public class IptvServerConfig {
 
     public String getXmltvUrl() {
         return xmltvUrl;
+    }
+
+    public Duration getXmltvBefore() {
+        return xmltvBefore;
+    }
+
+    public Duration getXmltvAfter() {
+        return xmltvAfter;
     }
 
     public boolean getSendUser() {
@@ -110,6 +121,16 @@ public class IptvServerConfig {
 
         public Builder xmltvUrl(String xmltvUrl) {
             c.xmltvUrl = xmltvUrl;
+            return this;
+        }
+
+        public Builder xmltvBefore(Duration xmltvBefore) {
+            c.xmltvBefore = xmltvBefore;
+            return this;
+        }
+
+        public Builder xmltvAfter(Duration xmltvAfter) {
+            c.xmltvAfter = xmltvAfter;
             return this;
         }
 

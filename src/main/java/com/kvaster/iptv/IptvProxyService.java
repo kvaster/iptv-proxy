@@ -3,6 +3,8 @@ package com.kvaster.iptv;
 import java.net.HttpURLConnection;
 import java.net.http.HttpClient;
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -41,13 +43,17 @@ public class IptvProxyService implements HttpHandler {
         final List<IptvServer> servers = new ArrayList<>();
 
         final String xmltvUrl;
+        final Duration xmltvBefore;
+        final Duration xmltvAfter;
         final List<Pattern> groupFilters;
 
         byte[] xmltvCache;
 
-        IptvServerGroup(String name, String xmltvUrl, List<Pattern> groupFilters) {
+        IptvServerGroup(String name, String xmltvUrl, Duration xmltvBefore, Duration xmltvAfter, List<Pattern> groupFilters) {
             this.name = name;
             this.xmltvUrl = xmltvUrl;
+            this.xmltvBefore = xmltvBefore;
+            this.xmltvAfter = xmltvAfter;
             this.groupFilters = groupFilters;
         }
     }
@@ -109,7 +115,7 @@ public class IptvProxyService implements HttpHandler {
                 .build();
 
         config.getServers().forEach((sc) -> {
-            IptvServerGroup sg = new IptvServerGroup(sc.getName(), sc.getXmltvUrl(), sc.getGroupFilters());
+            IptvServerGroup sg = new IptvServerGroup(sc.getName(), sc.getXmltvUrl(), sc.getXmltvBefore(), sc.getXmltvAfter(), sc.getGroupFilters());
             serverGroups.add(sg);
             sc.getConnections().forEach((cc) -> sg.servers.add(new IptvServer(sc, cc, defaultHttpClient)));
         });
@@ -315,11 +321,16 @@ public class IptvProxyService implements HttpHandler {
                 });
             }
 
+            ZonedDateTime endOf = sg.xmltvAfter == null ? null : ZonedDateTime.now().plus(sg.xmltvAfter);
+            ZonedDateTime startOf = sg.xmltvBefore == null ? null : ZonedDateTime.now().minus(sg.xmltvBefore);
+
             if (xmltv != null) {
                 xmltv.getProgrammes().forEach(p -> {
-                    String newId = xmltvIds.get(p.getChannel());
-                    if (newId != null) {
-                        newXmltv.getProgrammes().add(p.copy().setChannel(newId));
+                    if ((endOf == null || p.getStart().compareTo(endOf) < 0) && (startOf == null || p.getStop().compareTo(startOf) > 0)) {
+                        String newId = xmltvIds.get(p.getChannel());
+                        if (newId != null) {
+                            newXmltv.getProgrammes().add(p.copy().setChannel(newId));
+                        }
                     }
                 });
             }

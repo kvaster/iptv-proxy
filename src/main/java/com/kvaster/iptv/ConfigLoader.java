@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.kvaster.utils.serialize.RelativeFileModule;
 
 public class ConfigLoader {
@@ -21,6 +23,7 @@ public class ConfigLoader {
                     .configure(MapperFeature.AUTO_DETECT_IS_GETTERS, false)
                     .configure(MapperFeature.AUTO_DETECT_SETTERS, false);
             mapper.registerModule(new RelativeFileModule(configFile.getParentFile()));
+            mapper.registerModule(new JavaTimeModule());
 
             return mapper.readValue(configFile, configClass);
         } catch (Exception e) {
