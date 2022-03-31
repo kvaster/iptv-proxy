@@ -5,7 +5,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -15,7 +14,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.introspect.VisibilityChecker;
-import com.fasterxml.jackson.dataformat.xml.JacksonXmlModule;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
@@ -27,18 +25,16 @@ public class XmltvUtils {
     public static final XmlMapper xmltvMapper = createMapper();
 
     public static XmlMapper createMapper() {
-        JacksonXmlModule xmlModule = new JacksonXmlModule();
-        xmlModule.setDefaultUseWrapper(false);
-        XmlMapper xm = new XmlMapper(xmlModule);
-        xm.registerModule(new JavaTimeModule());
-        xm.setVisibility(new VisibilityChecker.Std(JsonAutoDetect.Visibility.NONE, JsonAutoDetect.Visibility.NONE, JsonAutoDetect.Visibility.NONE, JsonAutoDetect.Visibility.ANY, JsonAutoDetect.Visibility.ANY));
-        xm.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        xm.configure(MapperFeature.AUTO_DETECT_GETTERS, false);
-        xm.configure(MapperFeature.AUTO_DETECT_IS_GETTERS, false);
-        xm.configure(MapperFeature.AUTO_DETECT_SETTERS, false);
-        xm.configure(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE, false);
-
-        return xm;
+        return XmlMapper.builder()
+                .configure(MapperFeature.AUTO_DETECT_GETTERS, false)
+                .configure(MapperFeature.AUTO_DETECT_IS_GETTERS, false)
+                .configure(MapperFeature.AUTO_DETECT_SETTERS, false)
+                .configure(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE, false)
+                .defaultUseWrapper(false)
+                .addModule(new JavaTimeModule())
+                .visibility(new VisibilityChecker.Std(JsonAutoDetect.Visibility.NONE, JsonAutoDetect.Visibility.NONE, JsonAutoDetect.Visibility.NONE, JsonAutoDetect.Visibility.ANY, JsonAutoDetect.Visibility.ANY))
+                .serializationInclusion(JsonInclude.Include.NON_NULL)
+                .build();
     }
 
     public static XmltvDoc parseXmltv(byte[] data) {
