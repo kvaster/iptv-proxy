@@ -1,12 +1,12 @@
 // common libs
-val jacksonVersion = "2.13.1"
-val jacksonDatabindVersion = "2.13.2"
+val jacksonVersion = "2.13.2"
+val jacksonDatabindVersion = "2.13.2.2"
 val jacksonDataFormatXmlVersion = "2.13.2"
 val janinoVersion = "3.1.6"
 val logbackVersion = "1.2.11"
 val slf4jVersion = "1.7.36"
-val snakeYamlVersion = "1.29"
-val undertowVersion = "2.2.16.Final"
+val snakeYamlVersion = "1.30"
+val undertowVersion = "2.2.17.Final"
 
 plugins {
     java
@@ -42,8 +42,8 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_13
-    targetCompatibility = JavaVersion.VERSION_13
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 application {
