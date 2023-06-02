@@ -174,9 +174,9 @@ public class IptvProxyService implements HttpHandler {
         Map<IptvServerGroup, CompletableFuture<byte[]>> xmltvLoads = new HashMap<>();
         serverGroups.forEach((sg) -> {
             if (sg.xmltvUrl != null) {
-                xmltvLoads.put(sg, xmltvLoader.loadAsync("xmltv: " + sg.name, sg.xmltvUrl, defaultHttpClient));
+                xmltvLoads.put(sg, loadXmltv(sg));
             }
-            sg.servers.forEach(s -> loads.put(s, channelsLoader.loadAsync("playlist: " + s.getName(), s.createRequest(s.getUrl()).build(), s.getHttpClient())));
+            sg.servers.forEach(s -> loads.put(s, loadChannels(s)));
         });
 
         XmltvDoc newXmltv = new XmltvDoc()
@@ -343,6 +343,16 @@ public class IptvProxyService implements HttpHandler {
         LOG.info("channels updated");
 
         return true;
+    }
+
+    private CompletableFuture<byte[]> loadXmltv(IptvServerGroup sg) {
+        var f = FileLoader.tryLoadBytes(sg.xmltvUrl);
+        return f != null ? f : xmltvLoader.loadAsync("xmltv: " + sg.name, sg.xmltvUrl, defaultHttpClient);
+    }
+
+    private CompletableFuture<String> loadChannels(IptvServer s) {
+        var f = FileLoader.tryLoadString(s.getUrl());
+        return f != null ? f : channelsLoader.loadAsync("playlist: " + s.getName(), s.createRequest(s.getUrl()).build(), s.getHttpClient());
     }
 
     @Override
