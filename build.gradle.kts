@@ -1,20 +1,21 @@
 // common libs
-val jacksonVersion = "2.11.3"
-val jacksonDatabindVersion = "2.11.3"
-val janinoVersion = "3.1.0"
-val logbackVersion = "1.2.3"
-val slf4jVersion = "1.7.26"
-val snakeYamlVersion = "1.27"
-val undertowVersion = "2.2.2.Final"
+val jacksonVersion = "2.13.2"
+val jacksonDatabindVersion = "2.13.2.2"
+val jacksonDataFormatXmlVersion = "2.13.2"
+val janinoVersion = "3.1.6"
+val logbackVersion = "1.2.11"
+val slf4jVersion = "1.7.36"
+val snakeYamlVersion = "1.30"
+val undertowVersion = "2.2.17.Final"
 
 plugins {
     java
     application
-    id("com.github.johnrengelman.shadow") version "5.2.0"
+    id("com.github.johnrengelman.shadow") version "7.1.2"
 }
 
 tasks.wrapper {
-    gradleVersion = "6.7-rc-1"
+    gradleVersion = "7.4"
     distributionType = Wrapper.DistributionType.ALL
 }
 
@@ -34,19 +35,19 @@ dependencies {
     // app specific
     implementation("org.yaml:snakeyaml:$snakeYamlVersion")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksonVersion")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:$jacksonVersion")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:$jacksonDataFormatXmlVersion")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion")
     implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonDatabindVersion")
     implementation("io.undertow:undertow-core:$undertowVersion")
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_13
-    targetCompatibility = JavaVersion.VERSION_13
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 application {
-    mainClassName = "com.kvaster.iptv.App"
+    mainClass.set("com.kvaster.iptv.App")
 }
 
 configurations.forEach {

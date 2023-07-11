@@ -1,7 +1,9 @@
 package com.kvaster.iptv;
 
+import java.net.URI;
 import java.net.http.HttpClient;
-import java.time.Duration;
+import java.net.http.HttpRequest;
+import java.util.Base64;
 import java.util.Objects;
 
 import com.kvaster.iptv.config.IptvConnectionConfig;
@@ -17,13 +19,10 @@ public class IptvServer {
 
     private int acquired;
 
-    public IptvServer(IptvServerConfig sc, IptvConnectionConfig cc) {
+    public IptvServer(IptvServerConfig sc, IptvConnectionConfig cc, HttpClient httpClient) {
         this.sc = Objects.requireNonNull(sc);
         this.cc = Objects.requireNonNull(cc);
-
-        httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.ALWAYS)
-                .build();
+        this.httpClient = Objects.requireNonNull(httpClient);
     }
 
     public HttpClient getHttpClient() {
@@ -66,36 +65,36 @@ public class IptvServer {
         return sc.getChannelFailedMs();
     }
 
-    public long getInfoTimeoutSec() {
-        return sc.getInfoTimeoutSec();
+    public long getInfoTimeoutMs() {
+        return sc.getInfoTimeoutMs();
     }
 
-    public long getInfoTotalTimeoutSec() {
-        return sc.getInfoTotalTimeoutSec();
+    public long getInfoTotalTimeoutMs() {
+        return sc.getInfoTotalTimeoutMs();
     }
 
     public long getInfoRetryDelayMs() {
         return sc.getInfoRetryDelayMs();
     }
 
-    public long getCatchupTimeoutSec() {
-        return sc.getCatchupTimeoutSec();
+    public long getCatchupTimeoutMs() {
+        return sc.getCatchupTimeoutMs();
     }
 
-    public long getCatchupTotalTimeoutSec() {
-        return sc.getCatchupTotalTimeoutSec();
+    public long getCatchupTotalTimeoutMs() {
+        return sc.getCatchupTotalTimeoutMs();
     }
 
     public long getCatchupRetryDelayMs() {
         return sc.getCatchupRetryDelayMs();
     }
 
-    public long getStreamStartTimeoutSec() {
-        return sc.getStreamStartTimeoutSec();
+    public long getStreamStartTimeoutMs() {
+        return sc.getStreamStartTimeoutMs();
     }
 
-    public long getStreamReadTimeoutSec() {
-        return sc.getStreamReadTimeoutSec();
+    public long getStreamReadTimeoutMs() {
+        return sc.getStreamReadTimeoutMs();
     }
 
     public synchronized boolean acquire() {
@@ -111,5 +110,17 @@ public class IptvServer {
         if (acquired > 0) {
             acquired--;
         }
+    }
+
+    public HttpRequest.Builder createRequest(String url) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url));
+
+        // add basic authentication
+        if (cc.getLogin() != null && cc.getPassword() != null) {
+            builder.header("Authorization", "Basic " + Base64.getEncoder().encodeToString((cc.getLogin() + ":" + cc.getPassword()).getBytes()));
+        }
+
+        return builder;
     }
 }

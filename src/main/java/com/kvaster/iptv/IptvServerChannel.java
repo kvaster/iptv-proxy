@@ -10,11 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +35,6 @@ public class IptvServerChannel {
     private static final Logger LOG = LoggerFactory.getLogger(IptvServerChannel.class);
 
     private static final String TAG_EXTINF = "#EXTINF:";
-    private static final String TAG_PROGRAM_DATE_TIME = "#EXT-X-PROGRAM-DATE-TIME:";
     private static final String TAG_TARGET_DURATION = "#EXT-X-TARGETDURATION:";
 
     private final IptvServer server;
@@ -62,38 +58,34 @@ public class IptvServerChannel {
         String path;
         String url;
         String header;
-        long startTime;
         long durationMillis;
 
-        Stream(String path, String url, String header, long startTime, long durationMillis) {
+        Stream(String path, String url, String header, long durationMillis) {
             this.path = path;
             this.url = url;
             this.header = header;
-            this.startTime = startTime;
             this.durationMillis = durationMillis;
         }
 
         @Override
         public String toString() {
-            return "[path: " + path + ", url: " + url + ", start: " + new Date(startTime) + ", duration: " + (durationMillis / 1000f) + "s]";
+            return "[path: " + path + ", url: " + url + ", duration: " + (durationMillis / 1000f) + "s]";
         }
     }
 
     private static class Streams {
         List<Stream> streams = new ArrayList<>();
-        // cache only for 1s to avoid burst requests
-        long expireTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(1);
         long maxDuration = 0;
     }
 
     private interface StreamsConsumer {
-        void onInfo(Streams streams, int statusCode);
+        void onInfo(Streams streams, int statusCode, int retryNo);
     }
 
     private static class UserStreams {
-        Streams streams;
         List<StreamsConsumer> consumers = new ArrayList<>();
         Map<String, Stream> streamMap = new HashMap<>();
+        long maxDuration; // corresponds to current streamMap
         long infoTimeout;
         String channelUrl;
         boolean isCatchup;
@@ -140,8 +132,8 @@ public class IptvServerChannel {
 
         this.scheduler = scheduler;
 
-        defaultInfoTimeout = TimeUnit.SECONDS.toMillis(Math.max(server.getInfoTotalTimeoutSec(), server.getInfoTimeoutSec()) + 1);
-        defaultCatchupTimeout = TimeUnit.SECONDS.toMillis(Math.max(server.getCatchupTotalTimeoutSec(), server.getCatchupTimeoutSec()) + 1);
+        defaultInfoTimeout = Math.max(server.getInfoTotalTimeoutMs(), server.getInfoTimeoutMs()) + TimeUnit.SECONDS.toMillis(1);
+        defaultCatchupTimeout = Math.max(server.getCatchupTotalTimeoutMs(), server.getCatchupTimeoutMs()) + TimeUnit.SECONDS.toMillis(1);
 
         try {
             URI uri = new URI(channelUrl);
@@ -180,20 +172,15 @@ public class IptvServerChannel {
         userStreams.remove(userId);
     }
 
-    private HttpRequest.Builder createRequest(String url, IptvUser user) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(url));
+    private HttpRequest createRequest(String url, IptvUser user) {
+        HttpRequest.Builder builder = server.createRequest(url);
 
         // send user id to next iptv-proxy
-        if (server.getSendUser()) {
+        if (user != null && server.getSendUser()) {
             builder.header(IptvServer.PROXY_USER_HEADER, user.getId());
         }
 
-        if (server.getServerUser() != null) {
-            HttpUtils.addBase64Authorization(builder, server.getServerUser(), server.getServerPassword());
-        }
-
-        return builder;
+        return builder.build();
     }
 
     private long calculateTimeout(long duration) {
@@ -245,7 +232,7 @@ public class IptvServerChannel {
                 final String rid = RequestCounter.next();
                 LOG.info("{}[{}] stream: {}", rid, user.getId(), stream);
 
-                long timeout = calculateTimeout(us.streams.maxDuration);
+                long timeout = calculateTimeout(us.maxDuration);
                 user.setExpireTime(System.currentTimeMillis() + timeout);
 
                 runStream(rid, exchange, user, stream.url, timeout);
@@ -265,16 +252,16 @@ public class IptvServerChannel {
         }
 
         // be sure we have time to start stream
-        user.setExpireTime(System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(server.getStreamStartTimeoutSec()) + 100);
+        user.setExpireTime(System.currentTimeMillis() + server.getStreamStartTimeoutMs() + 100);
 
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
-            HttpRequest req = createRequest(url, user).build();
+            long startNanos = System.nanoTime();
 
             // configure buffering according to undertow buffers settings for best performance
-            httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofPublisher())
-                    .orTimeout(server.getStreamStartTimeoutSec(), TimeUnit.SECONDS)
+            httpClient.sendAsync(createRequest(url, user), HttpResponse.BodyHandlers.ofPublisher())
+                    .orTimeout(server.getStreamStartTimeoutMs(), TimeUnit.MILLISECONDS)
                     .whenComplete((resp, err) -> {
-                        if (HttpUtils.isOk(resp, err, exchange, rid)) {
+                        if (HttpUtils.isOk(resp, err, exchange, rid, startNanos)) {
                             resp.headers().map().forEach((name, values) -> {
                                 if (HEADERS.contains(name.toLowerCase())) {
                                     exchange.getResponseHeaders().addAll(new HttpString(name), values);
@@ -283,8 +270,8 @@ public class IptvServerChannel {
 
                             exchange.getResponseHeaders().add(HttpUtils.ACCESS_CONTROL, "*");
 
-                            long readTimeoutMs = TimeUnit.SECONDS.toMillis(server.getStreamReadTimeoutSec());
-                            resp.body().subscribe(new IptvStream(exchange, rid, user, Math.max(timeout, readTimeoutMs), readTimeoutMs, scheduler));
+                            long readTimeoutMs = server.getStreamReadTimeoutMs();
+                            resp.body().subscribe(new IptvStream(exchange, rid, user, Math.max(timeout, readTimeoutMs), readTimeoutMs, scheduler, startNanos));
                         }
                     });
         });
@@ -299,14 +286,20 @@ public class IptvServerChannel {
         exchange.dispatch(SameThreadExecutor.INSTANCE, () -> {
             String rid = RequestCounter.next();
             LOG.info("{}[{}] channel: {}, url: {}", rid, user.getId(), channelName, us.channelUrl);
-            loadCachedInfo((streams, statusCode) -> {
+            long startNanos = System.nanoTime();
+            loadCachedInfo((streams, statusCode, retryNo) -> {
                 if (streams == null) {
-                    LOG.warn("{}[{}] error loading streams info: {}", rid, user.getId(), statusCode);
+                    LOG.warn("{}[{}] error loading streams info: {}, retries: {}", rid, user.getId(), statusCode, retryNo);
 
                     exchange.setStatusCode(statusCode);
                     exchange.getResponseSender().send("error");
                 } else {
-                    LOG.info("{}[{}] ok", rid, user.getId());
+                    long duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+                    if (duration > 500 || retryNo > 0) {
+                        LOG.warn("{}[{}] channel success: {}ms, retries: {}", rid, user.getId(), duration, retryNo);
+                    } else {
+                        LOG.info("{}[{}] channel success: {}ms, retries: {}", rid, user.getId(), duration, retryNo);
+                    }
 
                     StringBuilder sb = new StringBuilder();
 
@@ -328,18 +321,12 @@ public class IptvServerChannel {
     }
 
     private void loadCachedInfo(StreamsConsumer consumer, IptvUser user, UserStreams us) {
-        Streams s = null;
-        boolean startReq = false;
+        boolean startReq;
 
         user.lock();
         try {
-            if (us.streams != null && System.currentTimeMillis() < us.streams.expireTime) {
-                s = us.streams;
-            } else {
-                us.streams = null;
-                startReq = us.consumers.size() == 0;
-                us.consumers.add(consumer);
-            }
+            startReq = us.consumers.size() == 0;
+            us.consumers.add(consumer);
         } finally {
             user.unlock();
         }
@@ -348,24 +335,24 @@ public class IptvServerChannel {
             loadInfo(
                     RequestCounter.next(),
                     0,
-                    System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(us.isCatchup ? server.getCatchupTotalTimeoutSec() : server.getInfoTotalTimeoutSec()),
+                    System.currentTimeMillis() + (us.isCatchup ? server.getCatchupTotalTimeoutMs() : server.getInfoTotalTimeoutMs()),
                     user,
                     us
             );
-        } else if (s != null) {
-            consumer.onInfo(s, 0);
         }
     }
 
     private void loadInfo(String rid, int retryNo, long expireTime, IptvUser user, UserStreams us) {
-        HttpRequest req = createRequest(us.channelUrl, user).build();
-
         LOG.info("{}[{}] loading channel: {}, url: {}, retry: {}", rid, user.getId(), channelName, us.channelUrl, retryNo);
 
-        httpClient.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                .orTimeout(us.isCatchup ? server.getCatchupTimeoutSec() : server.getInfoTimeoutSec(), TimeUnit.SECONDS)
+        long timeout = us.isCatchup ? server.getCatchupTimeoutMs() : server.getInfoTimeoutMs();
+        timeout = Math.min(Math.max(100, expireTime - System.currentTimeMillis()), timeout);
+
+        final long startNanos = System.nanoTime();
+        httpClient.sendAsync(createRequest(us.channelUrl, user), HttpResponse.BodyHandlers.ofString())
+                .orTimeout(timeout, TimeUnit.MILLISECONDS)
                 .whenComplete((resp, err) -> {
-                    if (HttpUtils.isOk(resp, err, rid)) {
+                    if (HttpUtils.isOk(resp, err, rid, startNanos)) {
                         String[] info = resp.body().split("\n");
 
                         Digest digest = Digest.sha256();
@@ -374,10 +361,7 @@ public class IptvServerChannel {
                         Map<String, Stream> streamMap = new HashMap<>();
                         Streams streams = new Streams();
 
-                        long m3uStart = 0;
-
                         long durationMillis = 0;
-                        long startTime = 0;
 
                         for (String l : info) {
                             l = l.trim();
@@ -394,13 +378,6 @@ public class IptvServerChannel {
                                         durationMillis = new BigDecimal(v).multiply(new BigDecimal(1000)).longValue();
                                         streams.maxDuration = Math.max(streams.maxDuration, durationMillis);
                                     } catch (NumberFormatException e) {
-                                        // do nothing
-                                    }
-                                } else if (l.startsWith(TAG_PROGRAM_DATE_TIME)) {
-                                    try {
-                                        ZonedDateTime dateTime = ZonedDateTime.parse(l.substring(TAG_PROGRAM_DATE_TIME.length()), DateTimeFormatter.ISO_DATE_TIME);
-                                        m3uStart = startTime = dateTime.toInstant().toEpochMilli();
-                                    } catch (Exception e) {
                                         // do nothing
                                     }
                                 } else if (l.startsWith(TAG_TARGET_DURATION)) {
@@ -438,13 +415,12 @@ public class IptvServerChannel {
 
 
                                 String path = digest.digest(l) + ".ts";
-                                Stream s = new Stream(path, l, sb.toString(), startTime, durationMillis);
+                                Stream s = new Stream(path, l, sb.toString(), durationMillis);
                                 streamMap.put(path, s);
                                 streams.streams.add(s);
 
                                 sb = new StringBuilder();
 
-                                startTime = durationMillis == 0 ? 0 : startTime + durationMillis;
                                 durationMillis = 0;
                             }
                         }
@@ -454,10 +430,9 @@ public class IptvServerChannel {
                         user.lock();
                         try {
                             us.streamMap = streamMap;
-                            us.streams = streams;
+                            us.maxDuration = streams.maxDuration;
 
-                            us.infoTimeout = calculateTimeout(streams.maxDuration);
-
+                            us.infoTimeout = calculateTimeout(us.maxDuration);
                             user.setExpireTime(System.currentTimeMillis() + us.infoTimeout);
 
                             cs = us.getAndClearConsumers();
@@ -465,9 +440,7 @@ public class IptvServerChannel {
                             user.unlock();
                         }
 
-                        LOG.info("{}[{}] m3u start: {}, end: {}, maxDuration: {}s", rid, user.getId(), new Date(m3uStart), new Date(startTime), streams.maxDuration / 1000f);
-
-                        cs.forEach(c -> c.onInfo(streams, -1));
+                        cs.forEach(c -> c.onInfo(streams, -1, retryNo));
                     } else {
                         if (System.currentTimeMillis() < expireTime) {
                             LOG.info("{}[{}] will retry", rid, user.getId());
@@ -492,7 +465,7 @@ public class IptvServerChannel {
                             }
 
                             int statusCode = resp == null ? HttpURLConnection.HTTP_INTERNAL_ERROR : resp.statusCode();
-                            us.getAndClearConsumers().forEach(c -> c.onInfo(null, statusCode));
+                            us.getAndClearConsumers().forEach(c -> c.onInfo(null, statusCode, retryNo));
                         }
                     }
                 });

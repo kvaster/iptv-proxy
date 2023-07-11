@@ -3,6 +3,8 @@ package com.kvaster.iptv;
 import java.net.HttpURLConnection;
 import java.net.http.HttpClient;
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -18,6 +20,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 import com.kvaster.iptv.config.IptvProxyConfig;
 import com.kvaster.iptv.m3u.M3uDoc;
@@ -41,12 +44,18 @@ public class IptvProxyService implements HttpHandler {
         final List<IptvServer> servers = new ArrayList<>();
 
         final String xmltvUrl;
+        final Duration xmltvBefore;
+        final Duration xmltvAfter;
+        final List<Pattern> groupFilters;
 
         byte[] xmltvCache;
 
-        IptvServerGroup(String name, String xmltvUrl) {
+        IptvServerGroup(String name, String xmltvUrl, Duration xmltvBefore, Duration xmltvAfter, List<Pattern> groupFilters) {
             this.name = name;
             this.xmltvUrl = xmltvUrl;
+            this.xmltvBefore = xmltvBefore;
+            this.xmltvAfter = xmltvAfter;
+            this.groupFilters = groupFilters;
         }
     }
 
@@ -54,8 +63,8 @@ public class IptvProxyService implements HttpHandler {
 
     private final Undertow undertow;
 
-    // use two threads instead of one
-    private final ScheduledExecutorService scheduler = new ScheduledThreadPoolExecutor(2);
+    private static final int SCHEDULER_THREADS = 2;
+    private final ScheduledExecutorService scheduler = createScheduler();
 
     private final BaseUrl baseUrl;
     private final String tokenSalt;
@@ -77,11 +86,22 @@ public class IptvProxyService implements HttpHandler {
     private final AsyncLoader<byte[]> xmltvLoader;
     private volatile byte[] xmltvData = null;
 
-    private final HttpClient defaultHttpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.ALWAYS)
-            .build();
+    private final HttpClient defaultHttpClient;
+
+    private static ScheduledExecutorService createScheduler() {
+        ScheduledThreadPoolExecutor s = new ScheduledThreadPoolExecutor(SCHEDULER_THREADS, (r, e) -> LOG.error("execution rejected"));
+        s.setRemoveOnCancelPolicy(true);
+        s.setMaximumPoolSize(SCHEDULER_THREADS);
+
+        return s;
+    }
 
     public IptvProxyService(IptvProxyConfig config) {
+        defaultHttpClient = HttpClient.newBuilder()
+                .version(config.getUseHttp2() ? HttpClient.Version.HTTP_2 : HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .build();
+
         baseUrl = new BaseUrl(config.getBaseUrl(), config.getForwardedPass());
 
         this.tokenSalt = config.getTokenSalt();
@@ -100,9 +120,9 @@ public class IptvProxyService implements HttpHandler {
                 .build();
 
         config.getServers().forEach((sc) -> {
-            IptvServerGroup sg = new IptvServerGroup(sc.getName(), sc.getXmltvUrl());
+            IptvServerGroup sg = new IptvServerGroup(sc.getName(), sc.getXmltvUrl(), sc.getXmltvBefore(), sc.getXmltvAfter(), sc.getGroupFilters());
             serverGroups.add(sg);
-            sc.getConnections().forEach((cc) -> sg.servers.add(new IptvServer(sc, cc)));
+            sc.getConnections().forEach((cc) -> sg.servers.add(new IptvServer(sc, cc, defaultHttpClient)));
         });
     }
 
@@ -159,9 +179,9 @@ public class IptvProxyService implements HttpHandler {
         Map<IptvServerGroup, CompletableFuture<byte[]>> xmltvLoads = new HashMap<>();
         serverGroups.forEach((sg) -> {
             if (sg.xmltvUrl != null) {
-                xmltvLoads.put(sg, xmltvLoader.loadAsync("xmltv: " + sg.name, sg.xmltvUrl, null, null, defaultHttpClient));
+                xmltvLoads.put(sg, loadXmltv(sg));
             }
-            sg.servers.forEach(s -> loads.put(s, channelsLoader.loadAsync("playlist: " + s.getName(), s.getUrl(), s.getServerUser(), s.getServerPassword(), s.getHttpClient())));
+            sg.servers.forEach(s -> loads.put(s, loadChannels(s)));
         });
 
         XmltvDoc newXmltv = new XmltvDoc()
@@ -243,6 +263,13 @@ public class IptvProxyService implements HttpHandler {
                         String tvgId = c.getProp("tvg-id");
                         String tvgName = c.getProp("tvg-name");
 
+                        if (!sg.groupFilters.isEmpty()) {
+                            if (c.getGroups().stream().noneMatch((g) -> sg.groupFilters.stream().anyMatch((f) -> f.matcher(g).find()))) {
+                                // skip channel - filtered by group filter
+                                return;
+                            }
+                        }
+
                         XmltvChannel xmltvCh = null;
                         if (tvgId != null) {
                             xmltvCh = xmltvById.get(tvgId);
@@ -322,11 +349,16 @@ public class IptvProxyService implements HttpHandler {
                 sChs.forEach(ch -> chs.put(ch.getId(), ch));
             }
 
+            ZonedDateTime endOf = sg.xmltvAfter == null ? null : ZonedDateTime.now().plus(sg.xmltvAfter);
+            ZonedDateTime startOf = sg.xmltvBefore == null ? null : ZonedDateTime.now().minus(sg.xmltvBefore);
+
             if (xmltv != null) {
                 xmltv.getProgrammes().forEach(p -> {
-                    String newId = xmltvIds.get(p.getChannel());
-                    if (newId != null) {
-                        newXmltv.getProgrammes().add(p.copy().setChannel(newId));
+                    if ((endOf == null || p.getStart().compareTo(endOf) < 0) && (startOf == null || p.getStop().compareTo(startOf) > 0)) {
+                        String newId = xmltvIds.get(p.getChannel());
+                        if (newId != null) {
+                            newXmltv.getProgrammes().add(p.copy().setChannel(newId));
+                        }
                     }
                 });
             }
@@ -336,9 +368,19 @@ public class IptvProxyService implements HttpHandler {
         channels = chs;
         serverChannelsByUrl = byUrl;
 
-        LOG.info("channels updated.");
+        LOG.info("channels updated");
 
         return true;
+    }
+
+    private CompletableFuture<byte[]> loadXmltv(IptvServerGroup sg) {
+        var f = FileLoader.tryLoadBytes(sg.xmltvUrl);
+        return f != null ? f : xmltvLoader.loadAsync("xmltv: " + sg.name, sg.xmltvUrl, defaultHttpClient);
+    }
+
+    private CompletableFuture<String> loadChannels(IptvServer s) {
+        var f = FileLoader.tryLoadString(s.getUrl());
+        return f != null ? f : channelsLoader.loadAsync("playlist: " + s.getName(), s.createRequest(s.getUrl()).build(), s.getHttpClient());
     }
 
     @Override
@@ -416,7 +458,7 @@ public class IptvProxyService implements HttpHandler {
             return null;
         }
 
-        int idx = token.indexOf('-');
+        int idx = token.lastIndexOf('-');
         if (idx < 0) {
             return null;
         }

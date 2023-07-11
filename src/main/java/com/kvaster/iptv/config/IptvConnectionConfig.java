@@ -3,24 +3,10 @@ package com.kvaster.iptv.config;
 public class IptvConnectionConfig {
     private String url;
     private int maxConnections;
-    private String user;
+    private String login;
     private String password;
 
     protected IptvConnectionConfig() {
-        // for deserialization
-    }
-
-    public IptvConnectionConfig(String url, int maxConnections) {
-        this.url = url;
-        this.maxConnections = maxConnections;
-    }
-
-    public String getUser() {
-        return user;
-    }
-
-    public String getPassword() {
-        return password;
     }
 
     public String getUrl() {
@@ -29,5 +15,41 @@ public class IptvConnectionConfig {
 
     public int getMaxConnections() {
         return maxConnections;
+    }
+
+    public String getLogin() {
+        return login;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public static class Builder {
+        private final IptvConnectionConfig c = new IptvConnectionConfig();
+
+        public IptvConnectionConfig build() {
+            return c;
+        }
+
+        public Builder url(String url) {
+            c.url = url;
+            return this;
+        }
+
+        public Builder maxConnections(int maxConnections) {
+            c.maxConnections = maxConnections;
+            return this;
+        }
+
+        public Builder login(String login) {
+            c.login = login;
+            return this;
+        }
+
+        public Builder password(String password) {
+            c.password = password;
+            return this;
+        }
     }
 }

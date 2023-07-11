@@ -40,49 +40,41 @@ public class AsyncLoader<T> {
         this.handlerSupplier = handlerSupplier;
     }
 
-    public CompletableFuture<T> loadAsync(String msg, String url, String user, String password, HttpClient httpClient) {
+    public CompletableFuture<T> loadAsync(String msg, String url, HttpClient httpClient) {
+        return loadAsync(msg, HttpRequest.newBuilder().uri(URI.create(url)).build(), httpClient);
+    }
+
+    public CompletableFuture<T> loadAsync(String msg, HttpRequest req, HttpClient httpClient) {
         final String rid = RequestCounter.next();
 
         var future = new CompletableFuture<T>();
-        loadAsync(msg, url, user, password, 0, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(totalTimeoutSec), rid, future, httpClient);
+        loadAsync(msg, req, 0, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(totalTimeoutSec), rid, future, httpClient);
         return future;
     }
 
     private void loadAsync(
             String msg,
-            String url,
-            String user,
-            String password,
+            HttpRequest req,
             int retryNo,
             long expireTime,
             String rid,
             CompletableFuture<T> future,
             HttpClient httpClient
     ) {
-        LOG.info("{}loading {}, retry: {}, url: {}", rid, msg, retryNo, url);
+        LOG.info("{}loading {}, retry: {}, url: {}", rid, msg, retryNo, req.uri());
 
-        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder();
-        reqBuilder
-                .uri(URI.create(url))
-                .build();
-
-        if (user != null) {
-            HttpUtils.addBase64Authorization(reqBuilder, user, password);
-        }
-
-        HttpRequest req = reqBuilder.build();
-
+        final long startNanos = System.nanoTime();
         httpClient.sendAsync(req, handlerSupplier.get())
                 .orTimeout(timeoutSec, TimeUnit.SECONDS)
                 .whenComplete((resp, err) -> {
-                    if (HttpUtils.isOk(resp, err, rid)) {
+                    if (HttpUtils.isOk(resp, err, rid, startNanos)) {
                         future.complete(resp.body());
                     } else {
                         if (System.currentTimeMillis() < expireTime) {
                             LOG.warn("{}will retry", rid);
 
                             scheduler.schedule(
-                                    () -> loadAsync(msg, url, user, password, retryNo + 1, expireTime, rid, future, httpClient),
+                                    () -> loadAsync(msg, req, retryNo + 1, expireTime, rid, future, httpClient),
                                     retryDelayMs,
                                     TimeUnit.MILLISECONDS
                             );

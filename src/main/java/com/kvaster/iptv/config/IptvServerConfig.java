@@ -1,6 +1,11 @@
 package com.kvaster.iptv.config;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class IptvServerConfig {
     private String name;
@@ -8,44 +13,23 @@ public class IptvServerConfig {
     private String xmltvUrl;
     private boolean sortChannels;
     private String channelPrefix;
+    private Duration xmltvBefore;
+    private Duration xmltvAfter;
     private boolean sendUser;
     private boolean proxyStream = true;
     private long channelFailedMs;
-    private long infoTimeoutSec = 2;
-    private long infoTotalTimeoutSec = 5;
+    private long infoTimeoutMs = 1000;
+    private long infoTotalTimeoutMs = 2000;
     private long infoRetryDelayMs = 100;
-    private long catchupTimeoutSec = 5;
-    private long catchupTotalTimeoutSec = 10;
+    private long catchupTimeoutMs = 1000;
+    private long catchupTotalTimeoutMs = 2000;
     private long catchupRetryDelayMs = 100;
-    private long streamStartTimeoutSec = 2;
-    private long streamReadTimeoutSec = 2;
+    private long streamStartTimeoutMs = 1000;
+    private long streamReadTimeoutMs = 1000;
 
-    protected IptvServerConfig() {
-        // for deserialization
-    }
+    private List<Pattern> groupFilters = Collections.emptyList();
 
-    public IptvServerConfig(
-            String name,
-            List<IptvConnectionConfig> connections,
-            String xmltvUrl,
-            boolean sortChannels,
-            String channelPrefix,
-            boolean sendUser,
-            boolean proxyStream,
-            long channelFailedMs,
-            long infoTimeoutSec,
-            long infoRetryDelayMs
-    ) {
-        this.name = name;
-        this.connections = connections;
-        this.xmltvUrl = xmltvUrl;
-        this.sortChannels = sortChannels;
-        this.channelPrefix = channelPrefix;
-        this.sendUser = sendUser;
-        this.proxyStream = proxyStream;
-        this.channelFailedMs = channelFailedMs;
-        this.infoTimeoutSec = infoTimeoutSec;
-        this.infoRetryDelayMs = infoRetryDelayMs;
+    private IptvServerConfig() {
     }
 
     public String getName() {
@@ -60,6 +44,14 @@ public class IptvServerConfig {
         return xmltvUrl;
     }
 
+    public Duration getXmltvBefore() {
+        return xmltvBefore;
+    }
+
+    public Duration getXmltvAfter() {
+        return xmltvAfter;
+    }
+
     public boolean getSendUser() {
         return sendUser;
     }
@@ -72,36 +64,137 @@ public class IptvServerConfig {
         return channelFailedMs;
     }
 
-    public long getInfoTimeoutSec() {
-        return infoTimeoutSec;
+    public long getInfoTimeoutMs() {
+        return infoTimeoutMs;
     }
 
-    public long getInfoTotalTimeoutSec() {
-        return infoTotalTimeoutSec;
+    public long getInfoTotalTimeoutMs() {
+        return infoTotalTimeoutMs;
     }
 
     public long getInfoRetryDelayMs() {
         return infoRetryDelayMs;
     }
 
-    public long getCatchupTimeoutSec() {
-        return catchupTimeoutSec;
+    public long getCatchupTimeoutMs() {
+        return catchupTimeoutMs;
     }
 
-    public long getCatchupTotalTimeoutSec() {
-        return catchupTotalTimeoutSec;
+    public long getCatchupTotalTimeoutMs() {
+        return catchupTotalTimeoutMs;
     }
 
     public long getCatchupRetryDelayMs() {
         return catchupRetryDelayMs;
     }
 
-    public long getStreamStartTimeoutSec() {
-        return streamStartTimeoutSec;
+    public long getStreamStartTimeoutMs() {
+        return streamStartTimeoutMs;
     }
 
-    public long getStreamReadTimeoutSec() {
-        return streamReadTimeoutSec;
+    public long getStreamReadTimeoutMs() {
+        return streamReadTimeoutMs;
+    }
+
+    public List<Pattern> getGroupFilters() {
+        return groupFilters;
+    }
+
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final IptvServerConfig c = new IptvServerConfig();
+
+        public IptvServerConfig build() {
+            return c;
+        }
+
+        public Builder name(String name) {
+            c.name = name;
+            return this;
+        }
+
+        public Builder connections(Collection<IptvConnectionConfig> connections) {
+            c.connections = new ArrayList<>(connections);
+            return this;
+        }
+
+        public Builder xmltvUrl(String xmltvUrl) {
+            c.xmltvUrl = xmltvUrl;
+            return this;
+        }
+
+        public Builder xmltvBefore(Duration xmltvBefore) {
+            c.xmltvBefore = xmltvBefore;
+            return this;
+        }
+
+        public Builder xmltvAfter(Duration xmltvAfter) {
+            c.xmltvAfter = xmltvAfter;
+            return this;
+        }
+
+        public Builder sendUser(boolean sendUser) {
+            c.sendUser = sendUser;
+            return this;
+        }
+
+        public Builder proxyStream(boolean proxyStream) {
+            c.proxyStream = proxyStream;
+            return this;
+        }
+
+        public Builder channelFailedMs(long channelFailedMs) {
+            c.channelFailedMs = channelFailedMs;
+            return this;
+        }
+
+        public Builder infoTimeoutMs(long infoTimeoutMs) {
+            c.infoTimeoutMs = infoTimeoutMs;
+            return this;
+        }
+
+        public Builder infoTotalTimeoutMs(long infoTotalTimeoutMs) {
+            c.infoTotalTimeoutMs = infoTotalTimeoutMs;
+            return this;
+        }
+
+        public Builder infoRetryDelayMs(long infoRetryDelayMs) {
+            c.infoRetryDelayMs = infoRetryDelayMs;
+            return this;
+        }
+
+        public Builder catchupTimeoutMs(long catchupTimeoutMs) {
+            c.catchupTimeoutMs = catchupTimeoutMs;
+            return this;
+        }
+
+        public Builder catchupTotalTimeoutMs(long catchupTotalTimeoutMs) {
+            c.catchupTotalTimeoutMs = catchupTotalTimeoutMs;
+            return this;
+        }
+
+        public Builder catchupRetryDelayMs(long catchupRetryDelayMs) {
+            c.catchupRetryDelayMs = catchupRetryDelayMs;
+            return this;
+        }
+
+        public Builder streamStartTimeoutMs(long streamStartTimeoutMs) {
+            c.streamStartTimeoutMs = streamStartTimeoutMs;
+            return this;
+        }
+
+        public Builder streamReadTimeoutMs(long streamReadTimeoutMs) {
+            c.streamReadTimeoutMs = streamReadTimeoutMs;
+            return this;
+        }
+
+        public Builder groupFilters(Collection<Pattern> groupFilters) {
+            c.groupFilters = new ArrayList<>(groupFilters);
+            return this;
+        }
     }
 
     public boolean getSortChannels() {
