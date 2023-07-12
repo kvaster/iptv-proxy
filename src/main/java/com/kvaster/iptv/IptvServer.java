@@ -37,10 +37,6 @@ public class IptvServer {
         return cc.getUrl();
     }
 
-    public String getServerUser() {
-        return cc.getUser();
-    }
-
     public String getServerPassword() {
         return cc.getPassword();
     }
