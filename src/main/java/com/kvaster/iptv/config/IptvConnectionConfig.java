@@ -5,6 +5,7 @@ public class IptvConnectionConfig {
     private int maxConnections;
     private String login;
     private String password;
+    private String userAgent;
 
     protected IptvConnectionConfig() {
     }
@@ -23,6 +24,10 @@ public class IptvConnectionConfig {
 
     public String getPassword() {
         return password;
+    }
+
+    public String getUserAgent() {
+        return userAgent;
     }
 
     public static class Builder {
@@ -49,6 +54,11 @@ public class IptvConnectionConfig {
 
         public Builder password(String password) {
             c.password = password;
+            return this;
+        }
+
+        public Builder userAgent(String userAgent) {
+            c.userAgent = userAgent;
             return this;
         }
     }

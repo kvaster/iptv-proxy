@@ -117,6 +117,11 @@ public class IptvServer {
             builder.header("Authorization", "Basic " + Base64.getEncoder().encodeToString((cc.getLogin() + ":" + cc.getPassword()).getBytes()));
         }
 
+        // set custom user agent
+        if (cc.getUserAgent() != null) {
+            builder.setHeader("User-Agent", cc.getUserAgent());
+        }
+
         return builder;
     }
 }
