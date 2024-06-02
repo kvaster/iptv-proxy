@@ -1,0 +1,30 @@
+[versions]
+shadow = "8.1.1"
+versions = "0.51.0"
+
+slf4j = "2.0.13"
+logback = "1.5.6"
+janino = "3.1.12"
+
+undertow = "2.3.13.Final"
+snakeYaml = "2.2"
+jackson = "2.17.1"
+
+[plugins]
+shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
+versions = { id = "com.github.ben-manes.versions", version.ref = "versions" }
+
+[libraries]
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4j-log4j = { module = "org.slf4j:log4j-over-slf4j", version.ref = "slf4j" }
+slf4j-jul = { module = "org.slf4j:jul-to-slf4j", version.ref = "slf4j" }
+slf4j-jcl = { module = "org.slf4j:jcl-over-slf4j", version.ref = "slf4j" }
+logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+janino = { module = "org.codehaus.janino:janino", version.ref = "janino" }
+
+undertow = { module = "io.undertow:undertow-core", version.ref = "undertow" }
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeYaml" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
+jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson" }
+jackson-dataformat-xml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-xml", version.ref = "jackson" }

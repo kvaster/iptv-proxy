@@ -1,21 +1,12 @@
-// common libs
-val jacksonVersion = "2.13.2"
-val jacksonDatabindVersion = "2.13.2.2"
-val jacksonDataFormatXmlVersion = "2.13.2"
-val janinoVersion = "3.1.6"
-val logbackVersion = "1.2.11"
-val slf4jVersion = "1.7.36"
-val snakeYamlVersion = "1.30"
-val undertowVersion = "2.2.17.Final"
-
 plugins {
     java
     application
-    id("com.github.johnrengelman.shadow") version "7.1.2"
+    alias(libs.plugins.shadow)
+    alias(libs.plugins.versions)
 }
 
 tasks.wrapper {
-    gradleVersion = "7.4"
+    gradleVersion = "8.8"
     distributionType = Wrapper.DistributionType.ALL
 }
 
@@ -25,25 +16,25 @@ repositories {
 
 dependencies {
     // logging
-    implementation("org.slf4j:slf4j-api:$slf4jVersion")
-    implementation("org.slf4j:log4j-over-slf4j:$slf4jVersion")
-    implementation("org.slf4j:jcl-over-slf4j:$slf4jVersion")
-    implementation("org.slf4j:jul-to-slf4j:$slf4jVersion")
-    implementation("ch.qos.logback:logback-classic:$logbackVersion")
-    implementation("org.codehaus.janino:janino:$janinoVersion")
+    implementation(libs.slf4j.api)
+    implementation(libs.slf4j.log4j)
+    implementation(libs.slf4j.jcl)
+    implementation(libs.slf4j.jul)
+    implementation(libs.logback)
+    implementation(libs.janino)
 
     // app specific
-    implementation("org.yaml:snakeyaml:$snakeYamlVersion")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksonVersion")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:$jacksonDataFormatXmlVersion")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion")
-    implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonDatabindVersion")
-    implementation("io.undertow:undertow-core:$undertowVersion")
+    implementation(libs.undertow)
+    implementation(libs.snakeyaml)
+    implementation(libs.jackson.databind)
+    implementation(libs.jackson.datatype.jsr310)
+    implementation(libs.jackson.dataformat.yaml)
+    implementation(libs.jackson.dataformat.xml)
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 application {
