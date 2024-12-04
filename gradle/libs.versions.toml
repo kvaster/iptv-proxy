@@ -1,18 +1,20 @@
 [versions]
 shadow = "8.1.1"
 versions = "0.51.0"
+versionsFilter = "0.1.16"
 
-slf4j = "2.0.13"
-logback = "1.5.6"
+slf4j = "2.0.16"
+logback = "1.5.12"
 janino = "3.1.12"
 
-undertow = "2.3.13.Final"
-snakeYaml = "2.2"
-jackson = "2.17.1"
+undertow = "2.3.18.Final"
+snakeYaml = "2.3"
+jackson = "2.18.2"
 
 [plugins]
 shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
 versions = { id = "com.github.ben-manes.versions", version.ref = "versions" }
+versionsFilter = { id = "se.ascp.gradle.gradle-versions-filter", version.ref = "versionsFilter" }
 
 [libraries]
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }

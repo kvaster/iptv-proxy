@@ -3,10 +3,15 @@ plugins {
     application
     alias(libs.plugins.shadow)
     alias(libs.plugins.versions)
+    alias(libs.plugins.versionsFilter)
+}
+
+versionsFilter {
+    exclusiveQualifiers.addAll("dev", "eap", "beta", "alpha")
 }
 
 tasks.wrapper {
-    gradleVersion = "8.8"
+    gradleVersion = "8.11.1"
     distributionType = Wrapper.DistributionType.ALL
 }
 
